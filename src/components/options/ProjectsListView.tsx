@@ -66,6 +66,7 @@ export const ProjectsListView = forwardRef<HTMLDivElement, Props>(function Proje
   onDelete,
   onImport,
 }, ref) {
+  const safeProjects = Array.isArray(projects) ? projects : [];
   const fileRef = useRef<HTMLInputElement>(null);
   const sqliteFileRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
@@ -225,7 +226,7 @@ export const ProjectsListView = forwardRef<HTMLDivElement, Props>(function Proje
 
       {/* Project Cards */}
       <div className="space-y-4">
-        {(projects ?? []).map((project, index) => (
+        {safeProjects.map((project, index) => (
           <ProjectCard
             key={project.id}
             project={project}
@@ -236,7 +237,7 @@ export const ProjectsListView = forwardRef<HTMLDivElement, Props>(function Proje
           />
         ))}
 
-        {(projects ?? []).length === 0 && (
+        {safeProjects.length === 0 && (
           <p className="text-sm text-muted-foreground py-8 text-center anim-fade-in-up anim-delay-2">
             No projects yet. Create one to get started.
           </p>
@@ -299,7 +300,7 @@ export const ProjectsListView = forwardRef<HTMLDivElement, Props>(function Proje
           variant="outline"
           className="gap-2 hover:bg-primary/10 hover:text-primary transition-all duration-200"
           onClick={() => setSelectExportOpen(true)}
-          disabled={exporting || projects.length === 0}
+          disabled={exporting || safeProjects.length === 0}
           data-testid="projects-export-selected-open"
         >
           <ListChecks className="h-4 w-4" />
@@ -330,7 +331,7 @@ export const ProjectsListView = forwardRef<HTMLDivElement, Props>(function Proje
       {/* Export selected projects picker */}
       <SelectProjectsExportDialog
         open={selectExportOpen}
-        projects={projects}
+        projects={safeProjects}
         onOpenChange={setSelectExportOpen}
       />
     </div>
@@ -725,6 +726,7 @@ interface SelectProjectsExportDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+// eslint-disable-next-line max-lines-per-function
 function SelectProjectsExportDialog({
   open,
   projects,

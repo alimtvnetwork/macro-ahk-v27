@@ -592,6 +592,16 @@ export default defineConfig(({ mode }) => {
                         if (isSharedModule) {
                             return "background/index";
                         }
+
+                        // The background preflights user-script syntax with
+                        // Acorn because MV3 extension pages cannot use eval or
+                        // new Function(). Keep the parser inside the service
+                        // worker bundle so no split chunk import is emitted.
+                        const isBackgroundParser = id.includes("/node_modules/acorn/");
+
+                        if (isBackgroundParser) {
+                            return "background/index";
+                        }
                     },
                 },
             },

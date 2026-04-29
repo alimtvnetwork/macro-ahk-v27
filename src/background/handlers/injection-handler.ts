@@ -16,6 +16,7 @@
  */
 
 import type { MessageRequest, OkResponse } from "../../shared/messages";
+import { parse } from "acorn";
 import { logBgWarnError, logCaughtError, BgLogTag } from "../bg-logger";
 import type { InjectableScript, InjectionResult, InjectScriptsResponse, SkipReason } from "../../shared/injection-types";
 import type { StoredProject, ScriptEntry } from "../../shared/project-types";
@@ -142,6 +143,7 @@ function getInlineSyntaxCheckScript(
     };
 }
 
+// eslint-disable-next-line max-lines-per-function
 function requestHasInlineSyntaxError(
     scripts: InjectionRequestScript[],
 ): boolean {
@@ -773,12 +775,16 @@ async function injectAllScripts(
  */
 function detectSyntaxError(code: string): string | null {
     try {
-        new Function(code);
+        parse(`(function(){\n${code}\n});`, {
+            ecmaVersion: "latest",
+            sourceType: "script",
+            allowReturnOutsideFunction: false,
+        });
         return null;
     } catch (err) {
-        if (err instanceof SyntaxError) {
+        if (err instanceof SyntaxError || err instanceof Error) {
             console.debug(
-                "[injection:syntax-preflight] detectSyntaxError caught SyntaxError (codeLen=%d): %s",
+                "[injection:syntax-preflight] detectSyntaxError caught parse error (codeLen=%d): %s",
                 code.length,
                 err.message,
             );
@@ -911,6 +917,7 @@ function extractMacroVersion(code: string): string | null {
 }
 
 /** Logs a successful script injection to the logs DB. */
+// eslint-disable-next-line max-lines-per-function
 async function logInjectionSuccess(
     script: InjectableScript,
     projectId: string | undefined,
@@ -1547,6 +1554,7 @@ const relayInjectedTabs = new Set<number>();
  * ✅ 15.6: Optimized relay injection — single combined probe-and-inject.
  * Reduces from 2-4 executeScript IPC calls to 1-2.
  */
+// eslint-disable-next-line max-lines-per-function
 async function ensureRelayInjected(tabId: number): Promise<void> {
     if (relayInjectedTabs.has(tabId)) {
         return;
