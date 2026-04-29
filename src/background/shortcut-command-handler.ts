@@ -175,11 +175,6 @@ function sendInternalMessage<T>(message: Record<string, unknown>): Promise<T> {
  */
 async function toggleRecordingFromShortcut(): Promise<void> {
     try {
-        const [{ loadSession, persistSession }, { recorderReducer, IDLE_SESSION }] = await Promise.all([
-            import("./recorder/recorder-session-storage"),
-            import("./recorder/recorder-store"),
-        ]);
-
         const current = (await loadSession()) ?? IDLE_SESSION;
         const projectSlug = await getActiveProjectSlug();
         if (current.Phase === "Idle" && projectSlug === null) {
