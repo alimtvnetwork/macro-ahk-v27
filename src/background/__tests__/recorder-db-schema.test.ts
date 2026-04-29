@@ -39,7 +39,7 @@ function rowCount(db: ReturnType<typeof freshDb>, table: string): number {
 }
 
 describe("RECORDER_DB_SCHEMA", () => {
-    it("creates all 11 tables on a fresh DB", () => {
+    it("creates all 12 tables on a fresh DB", () => {
         const db = freshDb();
         const result = db.exec(
             "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
@@ -57,6 +57,7 @@ describe("RECORDER_DB_SCHEMA", () => {
             "Step",
             "StepKind",
             "StepStatus",
+            "StepTag",
         ]);
     });
 
