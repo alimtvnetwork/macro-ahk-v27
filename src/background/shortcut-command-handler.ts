@@ -13,6 +13,8 @@ import { normalizeInjectScriptsResponse } from "../shared/injection-types";
 import { MessageType } from "../shared/messages";
 import { handleMessage } from "./message-router";
 import { logCaughtError, logBgWarnError, BgLogTag} from "./bg-logger";
+import { loadSession, persistSession } from "./recorder/recorder-session-storage";
+import { recorderReducer, IDLE_SESSION } from "./recorder/recorder-store";
 
 const RUN_SCRIPTS_COMMAND = "run-scripts";
 const FORCE_RUN_SCRIPTS_COMMAND = "force-run-scripts";
