@@ -60,10 +60,10 @@ const isStepASuccess = (stepA: StepAResult): boolean => {
     return stepA.Error === null && stepA.Membership !== null && stepA.WorkspaceId !== null;
 };
 
-const handleStepAFailure = (
+const handleStepAFailure = async (
     ctx: UserAddRowContext, sink: UserAddLogSink, store: UserAddRowStateStore,
     startedAt: number, errorMessage: string,
-): UserAddRowResult => {
+): Promise<UserAddRowResult> => {
     logStep(ctx, sink, UserAddLogPhase.StepA, UserAddLogSeverity.Error, `Step A failed: ${errorMessage}`);
     return finalizeUserAddRow(ctx, sink, store, buildRowFailure({
         rowIndex: ctx.Row.RowIndex, startedAt,
