@@ -14,9 +14,9 @@
 
 import { TARGET_TEXT, TARGET_XPATH } from "./types";
 
-// 9 = XPathResult.FIRST_ORDERED_NODE_TYPE. Keep this numeric so the
-// standalone bundle can be smoke-tested in Node shims without a global
-// XPathResult constructor.
+// 9 is the DOM XPath "first ordered node" result type. Keep this numeric so
+// the standalone bundle can be smoke-tested in Node shims without browser-only
+// XPath globals.
 const XPATH_RESULT_FIRST_ORDERED_NODE_TYPE = 9;
 
 function isHtmlElement(node: Node | null): node is HTMLElement {
