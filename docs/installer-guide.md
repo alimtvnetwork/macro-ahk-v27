@@ -145,7 +145,7 @@ The installer picks **exactly one** version using this waterfall — the first s
 1. **Explicit `--version` / `-Version` flag.** Must match `^v\d+\.\d+\.\d+(-pre)?$` or be the literal `latest`.
 2. **URL self-detection** — if the script was downloaded from `…/releases/download/<vX.Y.Z>/install.sh`, that version is implicitly pinned. This is **strict mode** (see §6).
 3. **GitHub Releases API → `latest`** — used when piped from `raw.githubusercontent.com/.../main/` and no `--version` was passed.
-4. **Sibling-repo discovery** _(opt-in, discovery mode only)_ — probes `macro-ahk-v24`, `…-v25`, … in parallel for a higher-numbered repo. Off by default. Run with `--enable-sibling-discovery` or `SIBLING_DISCOVERY_ENABLED=1`.
+4. **Sibling-repo discovery** _(opt-in, discovery mode only)_ — probes `macro-ahk-v26`, `…-v25`, … in parallel for a higher-numbered repo. Off by default. Run with `--enable-sibling-discovery` or `SIBLING_DISCOVERY_ENABLED=1`.
 5. **Main-branch tarball fallback** — when the API responds **200 OK with zero releases** or **404 Not Found** for `/releases/latest`, the installer downloads `archive/refs/heads/main.tar.gz` and records the version as `<branch>@HEAD`. You'll see the `🌿 Discovery mode — main branch (no releases found)` banner.
 
 > ⚠️ **Network failures during discovery (5xx, DNS error, no curl) → exit 5.** The installer never silently falls through to `main` if the user might have wanted a real release.
