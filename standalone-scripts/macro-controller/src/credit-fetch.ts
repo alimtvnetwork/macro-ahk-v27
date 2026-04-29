@@ -40,7 +40,22 @@ interface SdkApiResponse {
 }
 
 async function apiFetchWorkspaces(): Promise<SdkApiResponse> {
-  return window.marco!.api!.credits.fetchWorkspaces({ baseUrl: CREDIT_API_BASE });
+  // SDK readiness guard — converts the cryptic "Cannot read properties of
+  // undefined (reading 'credits')" crash into a typed, actionable error
+  // when MacroController runs before the marco-sdk has finished injecting
+  // (load-order race). See mem://standards/verbose-logging-and-failure-diagnostics.
+  const sdk = window.marco;
+  if (!sdk) {
+    throw new Error('SdkNotReady: window.marco is undefined (marco-sdk script has not injected yet)');
+  }
+  if (!sdk.api) {
+    throw new Error('SdkNotReady: window.marco.api is undefined (SDK partially initialized)');
+  }
+  if (!sdk.api.credits || typeof sdk.api.credits.fetchWorkspaces !== 'function') {
+    throw new Error('SdkNotReady: window.marco.api.credits.fetchWorkspaces is unavailable');
+  }
+
+  return sdk.api.credits.fetchWorkspaces({ baseUrl: CREDIT_API_BASE });
 }
 
 function isAuthFailure(status: number): boolean {

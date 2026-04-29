@@ -229,7 +229,10 @@ async function doFetchWorkspacesForMove(
     return doFetchWorkspacesForMove(false, true);
   }
 
-  const resp = await window.marco!.api!.credits.fetchWorkspaces({ baseUrl: CREDIT_API_BASE });
+  if (!window.marco?.api?.credits?.fetchWorkspaces) {
+    throw new Error('SdkNotReady: window.marco.api.credits.fetchWorkspaces unavailable');
+  }
+  const resp = await window.marco.api.credits.fetchWorkspaces({ baseUrl: CREDIT_API_BASE });
 
   if (isAuthFailure(resp.status) && !isRetry) {
     await handleAdjacentAuthFailure(token, resp.status);

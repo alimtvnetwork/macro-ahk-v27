@@ -71,7 +71,12 @@ async function doubleConfirmAndMove(threshold: number): Promise<void> {
     return;
   }
 
-  const resp = await window.marco!.api!.credits.fetchWorkspaces({ baseUrl: CREDIT_API_BASE });
+  if (!window.marco?.api?.credits?.fetchWorkspaces) {
+    logError('Double-confirm API fetch failed', 'SdkNotReady: window.marco.api.credits.fetchWorkspaces unavailable');
+
+    return;
+  }
+  const resp = await window.marco.api.credits.fetchWorkspaces({ baseUrl: CREDIT_API_BASE });
 
   if (!resp.ok) {
     logError('Double-confirm API fetch failed', 'HTTP ' + resp.status);
@@ -250,7 +255,10 @@ async function doCycleFetchWithToken(isRetryAttempt: boolean): Promise<void> {
   logSub('Token source: ' + getLastTokenSource(), 1);
 
   try {
-    const resp = await window.marco!.api!.credits.fetchWorkspaces({ baseUrl: CREDIT_API_BASE });
+    if (!window.marco?.api?.credits?.fetchWorkspaces) {
+      throw new Error('SdkNotReady: window.marco.api.credits.fetchWorkspaces unavailable');
+    }
+    const resp = await window.marco.api.credits.fetchWorkspaces({ baseUrl: CREDIT_API_BASE });
 
     if (isAuthFailure(resp.status) && !isRetryAttempt) {
       await handleFallbackAuthRecovery(
