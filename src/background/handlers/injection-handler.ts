@@ -782,20 +782,13 @@ function detectSyntaxError(code: string): string | null {
         });
         return null;
     } catch (err) {
-        if (err instanceof SyntaxError || err instanceof Error) {
-            console.debug(
-                "[injection:syntax-preflight] detectSyntaxError caught parse error (codeLen=%d): %s",
-                code.length,
-                err.message,
-            );
-            return err.message;
-        }
+        const message = err instanceof Error ? err.message : String(err);
         console.debug(
-            "[injection:syntax-preflight] detectSyntaxError caught non-SyntaxError (codeLen=%d): %s",
+            "[injection:syntax-preflight] detectSyntaxError caught parse error (codeLen=%d): %s",
             code.length,
-            err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+            message,
         );
-        return null;
+        return message;
     }
 }
 
