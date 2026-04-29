@@ -14,6 +14,23 @@
 
 import { TARGET_TEXT, TARGET_XPATH } from "./types";
 
+// 9 = XPathResult.FIRST_ORDERED_NODE_TYPE. Keep this numeric so the
+// standalone bundle can be smoke-tested in Node shims without a global
+// XPathResult constructor.
+const XPATH_RESULT_FIRST_ORDERED_NODE_TYPE = 9;
+
+function isHtmlElement(node: Node | null): node is HTMLElement {
+    if (node === null) {
+        return false;
+    }
+
+    if (typeof HTMLElement === "undefined") {
+        return false;
+    }
+
+    return node instanceof HTMLElement;
+}
+
 export class BannerLocator {
     /**
      * Resolve the target element if it exists in the live DOM AND
@@ -27,20 +44,16 @@ export class BannerLocator {
         if (typeof document === "undefined" || typeof document.evaluate !== "function") {
             return null;
         }
-        // Use numeric constant (9 = FIRST_ORDERED_NODE_TYPE) so the bundle
-        // is safe to evaluate in Node-based smoke tests where the global
-        // `XPathResult` is not defined.
-        const FIRST_ORDERED_NODE_TYPE = 9;
         const result = document.evaluate(
             TARGET_XPATH,
             document,
             null,
-            FIRST_ORDERED_NODE_TYPE,
+            XPATH_RESULT_FIRST_ORDERED_NODE_TYPE,
             null,
         );
         const node = result.singleNodeValue;
 
-        if (!(node instanceof HTMLElement)) {
+        if (!isHtmlElement(node)) {
             return null;
         }
 
