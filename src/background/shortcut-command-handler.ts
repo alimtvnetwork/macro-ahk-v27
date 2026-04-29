@@ -13,6 +13,8 @@ import { normalizeInjectScriptsResponse } from "../shared/injection-types";
 import { MessageType } from "../shared/messages";
 import { handleMessage } from "./message-router";
 import { logCaughtError, logBgWarnError, BgLogTag} from "./bg-logger";
+import { loadSession, persistSession } from "./recorder/recorder-session-storage";
+import { recorderReducer, IDLE_SESSION } from "./recorder/recorder-store";
 
 const RUN_SCRIPTS_COMMAND = "run-scripts";
 const FORCE_RUN_SCRIPTS_COMMAND = "force-run-scripts";
@@ -173,11 +175,6 @@ function sendInternalMessage<T>(message: Record<string, unknown>): Promise<T> {
  */
 async function toggleRecordingFromShortcut(): Promise<void> {
     try {
-        const [{ loadSession, persistSession }, { recorderReducer, IDLE_SESSION }] = await Promise.all([
-            import("./recorder/recorder-session-storage"),
-            import("./recorder/recorder-store"),
-        ]);
-
         const current = (await loadSession()) ?? IDLE_SESSION;
         const projectSlug = await getActiveProjectSlug();
         if (current.Phase === "Idle" && projectSlug === null) {
