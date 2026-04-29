@@ -1877,6 +1877,24 @@ jobs:
           name: payment-banner-hider-dist
           path: standalone-scripts/payment-banner-hider/dist/
 
+      - name: Download Lovable Common dist
+        uses: actions/download-artifact@v4
+        with:
+          name: lovable-common-dist
+          path: standalone-scripts/lovable-common/dist/
+
+      - name: Download Lovable Owner Switch dist
+        uses: actions/download-artifact@v4
+        with:
+          name: lovable-owner-switch-dist
+          path: standalone-scripts/lovable-owner-switch/dist/
+
+      - name: Download Lovable User Add dist
+        uses: actions/download-artifact@v4
+        with:
+          name: lovable-user-add-dist
+          path: standalone-scripts/lovable-user-add/dist/
+
       # ── Artifact traceability ───────────────────────────────────
       # When a downstream step says "bundle missing", the first
       # question is always: WHICH artifact did we actually pull?
@@ -2003,7 +2021,7 @@ jobs:
           {
             echo "### ✅ Build-extension casing gate"
             echo ""
-            echo "All four standalone projects passed before vite copied JSON into the extension bundle:"
+            echo "All standalone projects passed before vite copied JSON into the extension bundle:"
             echo "- \`dist/instruction.json\` → **PascalCase keys only** (canonical)"
             echo "- \`dist/instruction.compat.json\` → **camelCase keys only** (transitional snapshot)"
           } >> "$GITHUB_STEP_SUMMARY"
