@@ -98,6 +98,12 @@ const COMPAT_READER_ALLOWLIST = new Set([
     // that's the input under test, not a consumption site.
     "scripts/__tests__/check-instruction-json-casing-truncation.test.mjs",
     "scripts/__tests__/check-instruction-json-casing-truncation-snapshot.test.mjs",
+    // Schema validator: validates BOTH the canonical PascalCase
+    // instruction.json AND the Phase-2b compat instruction.compat.json
+    // against their respective Zod schemas. It only references the
+    // compat filename for path construction + schema dispatch — it
+    // does not consume camelCase keys outside the schema definition.
+    "scripts/validate-instruction-schema.mjs",
 ]);
 
 /* ----------------------------------------------------------------- */
