@@ -562,8 +562,10 @@ export async function sha256Hex(bytes: Uint8Array): Promise<string> {
     if (typeof globalThis.crypto?.subtle?.digest !== "function") {
         throw new Error("sha256Hex: globalThis.crypto.subtle.digest unavailable");
     }
-    // Pass an ArrayBuffer view — Web Crypto types reject Uint8Array directly in some libs.
-    const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes.slice().buffer);
+    // Copy into a fresh ArrayBuffer — Node's webcrypto rejects Uint8Array and SharedArrayBuffer.
+    const copy = new Uint8Array(bytes.byteLength);
+    copy.set(bytes);
+    const digest = await globalThis.crypto.subtle.digest("SHA-256", copy.buffer);
     const arr = new Uint8Array(digest);
     let out = "";
     for (let i = 0; i < arr.length; i++) {
