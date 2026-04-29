@@ -160,7 +160,6 @@ function buildScriptBindings(entries: ScriptEntry[]): ScriptBindingResolved[] {
 }
 
 /** Classifies a raw entry into one of four buckets — never throws. */
-// eslint-disable-next-line sonarjs/cognitive-complexity -- defensive classifier
 function classifyEntry(entry: RawEntry, index: number): Classified {
     if (typeof entry !== "object" || entry === null) {
         return {

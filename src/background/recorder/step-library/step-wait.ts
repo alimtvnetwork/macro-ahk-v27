@@ -408,7 +408,6 @@ export async function waitForSelector(
                     `(${matches.length} match${matches.length === 1 ? "" : "es"}).`,
             };
         }
-        // eslint-disable-next-line no-await-in-loop
         await sleep(Math.min(pollMs, config.TimeoutMs - elapsed));
     }
 }

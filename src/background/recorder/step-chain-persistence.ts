@@ -51,7 +51,7 @@ export const MAX_SLUG_LENGTH = 128;
 /** Tag names: alphanumeric, dash, underscore, dot, space (1..MAX_TAG_LENGTH). */
 const TAG_NAME_PATTERN = /^[A-Za-z0-9_\-. ]+$/;
 /** Project slug: alphanumeric, dash, underscore, dot. */
-const PROJECT_SLUG_PATTERN = /^[A-Za-z0-9_.\-]+$/;
+const PROJECT_SLUG_PATTERN = /^[A-Za-z0-9_.-]+$/;
 
 function assertRetry(n: number): void {
     if (!Number.isInteger(n) || n < 0) throw new Error(`RetryCount must be a non-negative integer; got ${n}`);

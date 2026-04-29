@@ -27,7 +27,6 @@ interface ChromeStorageStub {
 }
 
 declare global {
-    // eslint-disable-next-line no-var
     var chrome: ChromeStorageStub;
 }
 

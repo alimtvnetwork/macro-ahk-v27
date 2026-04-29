@@ -138,7 +138,6 @@ function collectFiles() {
  * full parser for this guard, and pulling in a TS AST package would
  * make the scanner orders of magnitude slower and add a heavy dep.
  */
-// eslint-disable-next-line max-lines-per-function
 function stripStringsAndComments(src) {
     const out = new Array(src.length);
     let i = 0;
