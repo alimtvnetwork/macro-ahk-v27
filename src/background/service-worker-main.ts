@@ -41,6 +41,16 @@ try {
 }
 
 const BOOT_FAST_PATH_TYPES = new Set<string>([
+    MessageType.GET_OPTIONS_BOOTSTRAP,
+    MessageType.GET_ALL_PROJECTS,
+    MessageType.SAVE_PROJECT,
+    MessageType.DELETE_PROJECT,
+    MessageType.GET_ALL_SCRIPTS,
+    MessageType.SAVE_SCRIPT,
+    MessageType.DELETE_SCRIPT,
+    MessageType.GET_ALL_CONFIGS,
+    MessageType.SAVE_CONFIG,
+    MessageType.DELETE_CONFIG,
     MessageType.GET_CONFIG,
     MessageType.GET_TOKEN,
     MessageType.REFRESH_TOKEN,
