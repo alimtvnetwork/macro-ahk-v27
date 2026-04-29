@@ -1383,6 +1383,7 @@ jobs:
           set -euo pipefail
           node --input-type=module -e "
             import { readFileSync } from 'node:fs';
+            import { runInNewContext } from 'node:vm';
             const bundlePath = 'standalone-scripts/payment-banner-hider/dist/payment-banner-hider.js';
             const src = readFileSync(bundlePath, 'utf8');
 
@@ -1410,6 +1411,7 @@ jobs:
               location: { hostname: 'lovable.dev', href: 'https://lovable.dev/' },
               XPathResult: fakeXPathResult,
               MutationObserver: FakeMutationObserver,
+              setTimeout, clearTimeout,
             };
             const fakeDocument = {
               addEventListener: noop, removeEventListener: noop,
@@ -1419,13 +1421,19 @@ jobs:
               body: { appendChild: noop }, head: { appendChild: noop },
               createElement: () => ({ style: {}, setAttribute: noop, appendChild: noop }),
             };
-            globalThis.window = fakeWindow;
-            globalThis.document = fakeDocument;
-            globalThis.XPathResult = fakeXPathResult;
-            globalThis.MutationObserver = FakeMutationObserver;
+            const sandbox = {
+              console,
+              queueMicrotask,
+              setTimeout,
+              clearTimeout,
+              window: fakeWindow,
+              document: fakeDocument,
+              XPathResult: fakeXPathResult,
+              MutationObserver: FakeMutationObserver,
+            };
 
             try {
-              new Function(src)();
+              runInNewContext(src, sandbox, { filename: bundlePath, timeout: 5000 });
               console.log('✅ Bundle loaded and executed without throwing.');
             } catch (err) {
               console.error('::error file=' + bundlePath + '::Bundle threw on execution: ' + err.message);
