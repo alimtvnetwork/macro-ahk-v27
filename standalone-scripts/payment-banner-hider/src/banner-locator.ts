@@ -24,11 +24,18 @@ export class BannerLocator {
      *   (a programmer defect — must surface, not be swallowed).
      */
     public locate(): HTMLElement | null {
+        if (typeof document === "undefined" || typeof document.evaluate !== "function") {
+            return null;
+        }
+        // Use numeric constant (9 = FIRST_ORDERED_NODE_TYPE) so the bundle
+        // is safe to evaluate in Node-based smoke tests where the global
+        // `XPathResult` is not defined.
+        const FIRST_ORDERED_NODE_TYPE = 9;
         const result = document.evaluate(
             TARGET_XPATH,
             document,
             null,
-            XPathResult.FIRST_ORDERED_NODE_TYPE,
+            FIRST_ORDERED_NODE_TYPE,
             null,
         );
         const node = result.singleNodeValue;
