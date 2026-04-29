@@ -83,6 +83,10 @@ function getBootstrapData() {
   return bootstrapPromise;
 }
 
+function safeArray<T>(value: T[] | null | undefined): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
 export function useProjects() {
   const [projects, setProjects] = useState<StoredProject[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,7 +96,7 @@ export function useProjects() {
     const result = await sendMessage<{ projects: StoredProject[] }>({
       type: "GET_ALL_PROJECTS",
     });
-    setProjects(result.projects);
+    setProjects(safeArray(result.projects));
     setLoading(false);
   }, []);
 
@@ -108,7 +112,7 @@ export function useProjects() {
 
   useEffect(() => {
     getBootstrapData().then((data) => {
-      setProjects(data.projects);
+      setProjects(safeArray(data.projects));
       setLoading(false);
     });
   }, []);
@@ -126,7 +130,7 @@ export function useScripts() {
     const result = await sendMessage<{ scripts: StoredScript[] }>({
       type: "GET_ALL_SCRIPTS",
     });
-    setScripts(result.scripts);
+    setScripts(safeArray(result.scripts));
     setHasFetched(true);
     setLoading(false);
   }, []);
@@ -147,7 +151,7 @@ export function useScripts() {
 
   useEffect(() => {
     getBootstrapData().then((data) => {
-      setScripts(data.scripts);
+      setScripts(safeArray(data.scripts));
       setHasFetched(true);
       setLoading(false);
     });
@@ -166,7 +170,7 @@ export function useConfigs() {
     const result = await sendMessage<{ configs: StoredConfig[] }>({
       type: "GET_ALL_CONFIGS",
     });
-    setConfigs(result.configs);
+    setConfigs(safeArray(result.configs));
     setHasFetched(true);
     setLoading(false);
   }, []);
@@ -187,7 +191,7 @@ export function useConfigs() {
 
   useEffect(() => {
     getBootstrapData().then((data) => {
-      setConfigs(data.configs);
+      setConfigs(safeArray(data.configs));
       setHasFetched(true);
       setLoading(false);
     });
