@@ -105,7 +105,7 @@ export function savePanelToggles(sessionId: string, toggles: PanelToggles): void
 
     // Move the touched session to the end of the order list, then trim oldest.
     const orderWithoutCurrent = store.Order.filter((id) => id !== sessionId);
-    let order: string[] = [...orderWithoutCurrent, sessionId];
+    const order: string[] = [...orderWithoutCurrent, sessionId];
     while (order.length > MAX_SESSIONS) {
         const evict = order.shift();
         if (evict !== undefined) { delete sessions[evict]; }
