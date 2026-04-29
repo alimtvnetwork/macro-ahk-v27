@@ -163,6 +163,7 @@
     "@testing-library/dom": "^10.4.0",
     "@types/chrome": "^0.1.38",
     "@types/sql.js": "1.4.9",
+    "acorn": "^8.16.0",
     "axios": "1.14.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
