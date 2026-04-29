@@ -64,8 +64,7 @@ async function globalSetup() {
   console.log(`📦 Using package manager: ${pm}`);
 
   // build:extension requires every standalone dist artifact checked by
-  // scripts/check-standalone-dist.mjs to already exist on disk.
-  // to already exist on disk. CI builds them in parallel jobs; for local/playwright runs we
+  // scripts/check-standalone-dist.mjs to already exist on disk. CI builds them in parallel jobs; for local/playwright runs we
   // must build them sequentially first, then run the extension build.
   const buildSteps: { label: string; script: string; timeout: number }[] = [
     { label: 'marco-sdk',        script: 'build:sdk',              timeout: 180_000 },
