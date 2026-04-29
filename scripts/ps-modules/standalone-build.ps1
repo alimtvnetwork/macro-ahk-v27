@@ -108,14 +108,6 @@ function Build-StandaloneScript([string]$ScriptDirPath, [string]$ScriptName, [st
         }
     }
 
-    # ── Clear TypeScript / Vite caches to prevent stale module resolution ──
-    $tsBuildInfo = Join-Path $RootDir "tsconfig.macro.build.tsbuildinfo"
-    if (Test-Path $tsBuildInfo) { Remove-Item $tsBuildInfo -Force -ErrorAction SilentlyContinue }
-    $nodeCacheDir = Join-Path $RootDir "node_modules/.cache"
-    if (Test-Path $nodeCacheDir) { Remove-Item $nodeCacheDir -Recurse -Force -ErrorAction SilentlyContinue }
-    $viteCacheDir = Join-Path $RootDir "node_modules/.vite"
-    if (Test-Path $viteCacheDir) { Remove-Item $viteCacheDir -Recurse -Force -ErrorAction SilentlyContinue }
-
     # ── TypeScript -> JS (npm run build:<name>) ──
     Push-Location $RootDir
     try {
@@ -157,6 +149,18 @@ function Build-AllStandaloneScripts([string]$RootDir, [string]$BuildMode = "prod
     Write-Host "  Building standalone scripts (parallel, mode: $BuildMode)..." -ForegroundColor Yellow
 
     $standaloneDir = Join-Path $RootDir "standalone-scripts"
+
+    # Clear shared TypeScript / Vite caches exactly once before fan-out.
+    # Removing node_modules caches inside each parallel job is unsafe: one job
+    # can delete .vite/.cache while another job is running tsc/vite, producing
+    # intermittent marco-sdk/xpath failures with little or no inner diagnostic.
+    $tsBuildInfo = Join-Path $RootDir "tsconfig.macro.build.tsbuildinfo"
+    if (Test-Path $tsBuildInfo) { Remove-Item $tsBuildInfo -Force -ErrorAction SilentlyContinue }
+    $nodeCacheDir = Join-Path $RootDir "node_modules/.cache"
+    if (Test-Path $nodeCacheDir) { Remove-Item $nodeCacheDir -Recurse -Force -ErrorAction SilentlyContinue }
+    $viteCacheDir = Join-Path $RootDir "node_modules/.vite"
+    if (Test-Path $viteCacheDir) { Remove-Item $viteCacheDir -Recurse -Force -ErrorAction SilentlyContinue }
+
     $scriptDirs = Get-ChildItem -Path $standaloneDir -Directory -ErrorAction SilentlyContinue | Where-Object {
         Test-Path (Join-Path $_.FullName "src")
     }
