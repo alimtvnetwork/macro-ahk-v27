@@ -63,7 +63,7 @@ const isStepASuccess = (stepA: StepAResult): boolean => {
 const handleStepAFailure = (
     ctx: UserAddRowContext, sink: UserAddLogSink, store: UserAddRowStateStore,
     startedAt: number, errorMessage: string,
-): Promise<UserAddRowResult> => {
+): UserAddRowResult => {
     logStep(ctx, sink, UserAddLogPhase.StepA, UserAddLogSeverity.Error, `Step A failed: ${errorMessage}`);
     return finalizeUserAddRow(ctx, sink, store, buildRowFailure({
         rowIndex: ctx.Row.RowIndex, startedAt,
