@@ -513,9 +513,13 @@ export default defineConfig(({ mode }) => {
             copyManifest(),
             copyIcons(),
             validateNoBackgroundDynamicImport(),
-            // PERF-1 (2026-04-25): only emit build-meta.json in development.
-            // Shipping it in production keeps the SW awake every 1s via hot-reload.ts.
-            isDev ? generateBuildMeta() : null,
+            // Always emit build-meta.json — manifest.json declares it as a
+            // web-accessible resource, so the post-build manifest path
+            // validator fails if it is missing. Hot-reload polling is gated
+            // separately on `manifest.version_name` containing "dev"
+            // (see src/background/hot-reload.ts), so emitting the file in
+            // production does NOT keep the SW awake.
+            generateBuildMeta(),
             copyProjectScripts(),
             verifyWasmAsset(),
             // Bundle visualizer — gated behind ANALYZE=1 to keep the output slim.
