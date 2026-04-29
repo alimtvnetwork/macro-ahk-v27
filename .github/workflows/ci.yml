@@ -1396,20 +1396,33 @@ jobs:
             // and runs to completion — no behavioural assertion here
             // (that lives in the Playwright e2e suite).
             const noop = () => {};
+            const fakeXPathResult = {
+              FIRST_ORDERED_NODE_TYPE: 9,
+              ORDERED_NODE_SNAPSHOT_TYPE: 7,
+            };
+            class FakeMutationObserver {
+              observe() {}
+              disconnect() {}
+            }
             const fakeWindow = {
               addEventListener: noop, removeEventListener: noop,
               RiseupAsiaMacroExt: { Projects: {} },
               location: { hostname: 'lovable.dev', href: 'https://lovable.dev/' },
+              XPathResult: fakeXPathResult,
+              MutationObserver: FakeMutationObserver,
             };
             const fakeDocument = {
               addEventListener: noop, removeEventListener: noop,
               readyState: 'complete',
+              evaluate: () => ({ singleNodeValue: null, snapshotLength: 0, snapshotItem: () => null }),
               querySelector: () => null, querySelectorAll: () => [],
               body: { appendChild: noop }, head: { appendChild: noop },
               createElement: () => ({ style: {}, setAttribute: noop, appendChild: noop }),
             };
             globalThis.window = fakeWindow;
             globalThis.document = fakeDocument;
+            globalThis.XPathResult = fakeXPathResult;
+            globalThis.MutationObserver = FakeMutationObserver;
 
             try {
               new Function(src)();
