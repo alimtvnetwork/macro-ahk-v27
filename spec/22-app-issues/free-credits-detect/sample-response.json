@@ -1,0 +1,17 @@
+{
+  "$schema": "https://api.lovable.dev/GetWorkspaceCreditBalanceOutputBody.json",
+  "ledger_enabled": true,
+  "total_remaining": 3,
+  "total_granted": 5,
+  "daily_remaining": 3,
+  "daily_limit": 5,
+  "total_billing_period_used": 2,
+  "expiring_grants": [],
+  "grant_type_balances": [
+    {
+      "grant_type": "daily",
+      "granted": 5,
+      "remaining": 3
+    }
+  ]
+}

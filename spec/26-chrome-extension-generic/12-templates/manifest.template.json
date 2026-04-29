@@ -1,0 +1,89 @@
+{
+  "_template_header": {
+    "purpose": "MV3 manifest with permission decision tree comments",
+    "last_reviewed": "2026-04-24",
+    "tokens": [
+      "<PROJECT_NAME>   — human-readable extension name (e.g., MyExt)",
+      "<ROOT_NAMESPACE> — JS global namespace (e.g., MyExtNamespace)",
+      "<VERSION>        — semver string (e.g., 1.0.0)",
+      "<HOST_MATCHES>   — manifest match pattern(s) (e.g., https://example.com/*)",
+      "<EXTENSION_ID>   — Chrome Web Store id (after publish; not used in manifest body)"
+    ],
+    "_note": "Strip this _template_header block from the final manifest.json — Chrome ignores unknown root keys but a clean manifest is preferred."
+  },
+
+  "manifest_version": 3,
+  "name": "<PROJECT_NAME>",
+  "short_name": "<PROJECT_NAME>",
+  "version": "<VERSION>",
+  "description": "<PROJECT_NAME> — a Chrome MV3 extension built from the generic blueprint.",
+
+  "minimum_chrome_version": "116",
+
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+
+  "action": {
+    "default_title": "<PROJECT_NAME>",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
+
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<HOST_MATCHES>"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": false,
+      "world": "ISOLATED"
+    }
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": ["sdk.iife.js", "assets/*"],
+      "matches": ["<HOST_MATCHES>"]
+    }
+  ],
+
+  "permissions": [
+    "storage",
+    "scripting",
+    "tabs",
+    "alarms"
+  ],
+
+  "optional_permissions": [
+    "unlimitedStorage"
+  ],
+
+  "host_permissions": [
+    "<HOST_MATCHES>"
+  ],
+
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; base-uri 'self'; frame-ancestors 'none';"
+  }
+}

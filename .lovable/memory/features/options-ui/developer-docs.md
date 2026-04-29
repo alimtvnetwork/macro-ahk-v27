@@ -1,0 +1,4 @@
+# Memory: features/options-ui/developer-docs
+Updated: 2026-03-23
+
+The project detail view includes a dedicated 'Docs' tab and inline collapsible 'Developer Guide' sections across primary configuration tabs (Scripts, URL Rules, Variables, XPath, Cookies, and Files). These sections provide a full reference for the `RiseupAsiaMacroExt.Projects.<CodeName>` SDK sub-namespaces, including `.vars`, `.urls`, `.xpath`, `.cookies`, `.kv`, `.files`, `.meta`, `.log`, `.db` (Prisma-style SQLite queries), and `.api` (REST endpoints). A top-level 'Copy All' button allows developers to aggregate the entire guide into a Markdown-formatted string for sharing context with AI assistants. The database section documents all CRUD operations (create, findMany, findUnique, update, delete, count) with Prisma-style syntax examples.

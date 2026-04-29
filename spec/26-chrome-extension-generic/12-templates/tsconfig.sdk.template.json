@@ -1,0 +1,50 @@
+{
+  "//_template_header": {
+    "purpose": "TypeScript config for the page-injected SDK bundle (MAIN-world IIFE)",
+    "last_reviewed": "2026-04-24",
+    "tokens": ["<ROOT_NAMESPACE> — referenced in standalone-scripts/types/*.d.ts"]
+  },
+
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+
+    "types": [],
+
+    "noEmit": true,
+
+    "baseUrl": ".",
+    "paths": {
+      "@sdk/*": ["./standalone-scripts/sdk/src/*"],
+      "@types/*": ["./standalone-scripts/types/*"]
+    }
+  },
+
+  "include": [
+    "standalone-scripts/sdk/src/**/*.ts",
+    "standalone-scripts/types/**/*.d.ts"
+  ],
+
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts"
+  ],
+
+  "composite": true
+}

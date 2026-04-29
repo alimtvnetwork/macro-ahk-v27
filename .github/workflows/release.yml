@@ -1,0 +1,564 @@
+# ──────────────────────────────────────────────────────────────
+# Marco Extension — Release Pipeline
+#
+# Pipeline structure (parallel jobs):
+#   1. setup        — checkout, resolve version, lint, test
+#   2. build-sdk    — Marco SDK (dependency for others)
+#   3. build-standalone (parallel) — XPath, Macro Controller, Prompts
+#   4. build-extension — Chrome extension + package + release
+#
+# Produces a GitHub Release with these assets:
+#   - marco-extension-{VER}.zip    — Chrome extension dist contents
+#   - prompts-{VER}.zip            — standalone-scripts/prompts/**
+#   - macro-controller-{VER}.zip   — standalone-scripts/macro-controller/**
+#   - marco-sdk-{VER}.zip          — standalone-scripts/marco-sdk/**
+#   - xpath-{VER}.zip              — standalone-scripts/xpath/**
+#   - install.sh                   — Unified Bash installer (URL-pinned or latest)
+#   - install.ps1                  — Unified PowerShell installer (URL-pinned or latest)
+#   - VERSION.txt                  — Plain-text version identifier
+#   - changelog.md                 — Project changelog (full)
+#   - checksums.txt                — SHA256 checksums of all assets
+#
+# When the installer is downloaded from this release's asset URL
+# (https://github.com/{repo}/releases/download/{VER}/install.{ps1,sh}),
+# it auto-derives {VER} from its own URL and is implicitly pinned. When
+# downloaded from raw.githubusercontent.com/.../main/, it falls back to
+# the GitHub `latest` release. No build-time stamping required.
+#
+# NOTE: No email or notification integrations — by design.
+# ──────────────────────────────────────────────────────────────
+
+name: Release Build
+
+on:
+  push:
+    branches:
+      - "release/**"
+    tags:
+      - "v*"
+  # Manual replay path — used to recover a release whose original tag-push
+  # event never reached Actions (e.g., tag created via the GitHub web UI's
+  # "Create release from tag" flow). See
+  # spec/17-app-issues/95-release-page-missing-built-assets-rca.md and
+  # spec/11-chrome-extension/release-procedure.md.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Existing tag to (re)publish, e.g. v2.192.0'
+        required: true
+        type: string
+
+# Release builds must NEVER be cancelled — every release commit
+# must produce a GitHub Release regardless of newer commits.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # ════════════════════════════════════════════════════════════
+  # Job 1: Setup, Lint, Test, Resolve Version
+  # ════════════════════════════════════════════════════════════
+  setup:
+    name: Setup · Lint · Test
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+            if [[ -z "$VERSION" ]]; then
+              echo "::error::workflow_dispatch invoked without a version input"
+              exit 1
+            fi
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF_NAME}"
+          elif [[ "$GITHUB_REF" == refs/heads/release/* ]]; then
+            VERSION="${GITHUB_REF_NAME#release/}"
+          else
+            echo "::error::Unexpected ref: $GITHUB_REF"
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: ${VERSION}"
+
+      - name: Enforce lowercase .md filenames
+        run: |
+          VIOLATIONS=$(find . -name '*.md' \
+            -not -path './node_modules/*' \
+            -not -path './.git/*' \
+            -not -path './skipped/*' \
+            | grep '[A-Z]' || true)
+          if [ -n "$VIOLATIONS" ]; then
+            echo "::error::Uppercase .md filenames found — all .md files must be lowercase hyphen-case:"
+            echo "$VIOLATIONS"
+            exit 1
+          fi
+          echo "✅ All .md filenames are lowercase"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install root dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Run root lint
+        run: pnpm run lint
+
+      - name: Run tests
+        run: pnpm run test
+
+  # ════════════════════════════════════════════════════════════
+  # Job 2: Build SDK (dependency for other standalone scripts)
+  # ════════════════════════════════════════════════════════════
+  build-sdk:
+    name: Build · Marco SDK
+    needs: setup
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build Marco SDK
+        run: pnpm run build:sdk
+
+      - name: Upload SDK dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-dist
+          path: standalone-scripts/marco-sdk/dist/
+          retention-days: 1
+
+  # ════════════════════════════════════════════════════════════
+  # Job 3a: Build XPath (parallel with 3b, 3c)
+  # ════════════════════════════════════════════════════════════
+  build-xpath:
+    name: Build · XPath
+    needs: build-sdk
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Download SDK dist
+        uses: actions/download-artifact@v4
+        with:
+          name: sdk-dist
+          path: standalone-scripts/marco-sdk/dist/
+
+      - name: Build XPath
+        run: pnpm run build:xpath
+
+      - name: Upload XPath dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: xpath-dist
+          path: standalone-scripts/xpath/dist/
+          retention-days: 1
+
+  # ════════════════════════════════════════════════════════════
+  # Job 3b: Build Macro Controller (parallel with 3a, 3c)
+  # ════════════════════════════════════════════════════════════
+  build-macro-controller:
+    name: Build · Macro Controller
+    needs: build-sdk
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Download SDK dist
+        uses: actions/download-artifact@v4
+        with:
+          name: sdk-dist
+          path: standalone-scripts/marco-sdk/dist/
+
+      # See ci.yml for rationale — content-hash cache for the LESS output.
+      - name: Cache macro-looping.css (LESS output)
+        uses: actions/cache@v4
+        with:
+          path: |
+            standalone-scripts/macro-controller/dist/macro-looping.css
+            standalone-scripts/macro-controller/dist/.cache
+          key: ${{ runner.os }}-macro-less-${{ hashFiles('standalone-scripts/macro-controller/less/**/*.less', 'scripts/compile-less.mjs', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-macro-less-
+
+      - name: Build Macro Controller
+        run: pnpm run build:macro-controller
+
+      - name: Upload Macro Controller dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: macro-controller-dist
+          path: standalone-scripts/macro-controller/dist/
+          retention-days: 1
+
+  # ════════════════════════════════════════════════════════════
+  # Job 3c: Build Prompts (parallel with 3a, 3b)
+  # ════════════════════════════════════════════════════════════
+  build-prompts:
+    name: Build · Prompts
+    needs: setup
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build Prompts
+        run: pnpm run build:prompts
+
+      - name: Upload Prompts
+        uses: actions/upload-artifact@v4
+        with:
+          name: prompts-dist
+          path: standalone-scripts/prompts/
+          retention-days: 1
+
+  # ════════════════════════════════════════════════════════════
+  # Job 4: Build Extension + Package + Release
+  # ════════════════════════════════════════════════════════════
+  release:
+    name: Build · Extension · Release
+    needs: [setup, build-sdk, build-xpath, build-macro-controller, build-prompts]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install root dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Download SDK dist
+        uses: actions/download-artifact@v4
+        with:
+          name: sdk-dist
+          path: standalone-scripts/marco-sdk/dist/
+
+      - name: Download XPath dist
+        uses: actions/download-artifact@v4
+        with:
+          name: xpath-dist
+          path: standalone-scripts/xpath/dist/
+
+      - name: Download Macro Controller dist
+        uses: actions/download-artifact@v4
+        with:
+          name: macro-controller-dist
+          path: standalone-scripts/macro-controller/dist/
+
+      - name: Download Prompts
+        uses: actions/download-artifact@v4
+        with:
+          name: prompts-dist
+          path: standalone-scripts/prompts/
+
+      - name: Build Chrome extension
+        run: pnpm run build:extension
+
+      - name: Verify no source maps in dist
+        run: |
+          MAP_FILES=$(find chrome-extension/dist -name '*.map' 2>/dev/null || true)
+          if [ -n "$MAP_FILES" ]; then
+            echo "::error::Source map files found in dist — production builds must not include .map files:"
+            echo "$MAP_FILES"
+            exit 1
+          fi
+          echo "✅ No source map files in dist"
+
+      # ── Package assets ────────────────────────────────────
+      - name: Package release assets
+        env:
+          VER: ${{ needs.setup.outputs.version }}
+        run: |
+          mkdir -p release-assets
+
+          # ── Copy README + VERSION into extension dist ──
+          cp readme.md chrome-extension/dist/readme.md
+          echo "${VER}" > chrome-extension/dist/VERSION
+
+          # ── Remove source maps (must never ship in releases) ──
+          MAP_COUNT=$(find chrome-extension/dist -name '*.map' | wc -l | tr -d ' ')
+          find chrome-extension/dist -name '*.map' -delete
+          echo "Removed ${MAP_COUNT} source map files"
+
+          # ── Chrome extension — zip dist/ contents (no dist/ prefix) ──
+          cd chrome-extension/dist
+          zip -r "../../release-assets/marco-extension-${VER}.zip" .
+          cd ../..
+
+          # ── Standalone scripts ──
+          if [ -d "standalone-scripts/prompts" ]; then
+            cd standalone-scripts/prompts
+            zip -r "../../release-assets/prompts-${VER}.zip" .
+            cd ../..
+          fi
+
+          cd standalone-scripts/macro-controller
+          zip -r "../../release-assets/macro-controller-${VER}.zip" .
+          cd ../..
+
+          cd standalone-scripts/marco-sdk
+          zip -r "../../release-assets/marco-sdk-${VER}.zip" .
+          cd ../..
+
+          cd standalone-scripts/xpath
+          zip -r "../../release-assets/xpath-${VER}.zip" .
+          cd ../..
+
+          # ── Unified installer (URL-pinned when fetched from this release) ──
+          # No stamping needed: install.{ps1,sh} parse the version from their
+          # own download URL when fetched from /releases/download/{VER}/.
+          cp scripts/install.sh  release-assets/install.sh
+          cp scripts/install.ps1 release-assets/install.ps1
+          chmod +x release-assets/install.sh
+
+          # ── VERSION.txt ──
+          echo "${VER}" > release-assets/VERSION.txt
+
+          # ── changelog.md (full project changelog) ──
+          if [ -f changelog.md ]; then
+            cp changelog.md release-assets/changelog.md
+          fi
+
+          # ── Generate checksums ──
+          cd release-assets
+          sha256sum * > checksums.txt
+          cat checksums.txt
+          cd ..
+
+          echo ""
+          echo "=== Release assets ==="
+          ls -lh release-assets/
+
+      # ── Generate release notes from commit history ────────
+      - name: Generate release notes
+        id: changelog
+        env:
+          VER: ${{ needs.setup.outputs.version }}
+        run: |
+          # Find the previous release tag
+          PREV_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]' | head -1 2>/dev/null || true)
+
+          if [ -n "$PREV_TAG" ]; then
+            echo "Generating changelog: ${PREV_TAG}..HEAD"
+            RANGE="${PREV_TAG}..HEAD"
+          else
+            echo "No previous tag found — using full history"
+            RANGE=""
+          fi
+
+          REPO="${GITHUB_REPOSITORY}"
+          COMMIT_SHA="${GITHUB_SHA}"
+          BRANCH="${GITHUB_REF_NAME}"
+          BUILD_DATE="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+
+          # Build categorized release notes
+          {
+            echo "## Marco Extension ${VER}"
+            echo ""
+
+            echo "### Release Info"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Version | \`${VER}\` |"
+            echo "| Commit | \`${COMMIT_SHA:0:10}\` |"
+            echo "| Branch | \`${BRANCH}\` |"
+            echo "| Build Date | ${BUILD_DATE} |"
+            echo ""
+
+            echo "### What's Changed"
+            echo ""
+
+            # Features
+            FEATS=$(git log $RANGE --pretty=format:"- %s (%h)" --grep="^feat" -i 2>/dev/null || true)
+            if [ -n "$FEATS" ]; then
+              echo "#### Features"
+              echo "$FEATS"
+              echo ""
+            fi
+
+            # Fixes
+            FIXES=$(git log $RANGE --pretty=format:"- %s (%h)" --grep="^fix" -i 2>/dev/null || true)
+            if [ -n "$FIXES" ]; then
+              echo "#### Bug Fixes"
+              echo "$FIXES"
+              echo ""
+            fi
+
+            # Refactors / chores / docs
+            OTHER=$(git log $RANGE --pretty=format:"- %s (%h)" --grep="^refactor\|^chore\|^docs\|^style\|^perf\|^test\|^ci\|^build" -i 2>/dev/null || true)
+            if [ -n "$OTHER" ]; then
+              echo "#### Maintenance"
+              echo "$OTHER"
+              echo ""
+            fi
+
+            echo "---"
+            echo ""
+
+            echo "### Checksums (SHA256)"
+            echo ""
+            echo "\`\`\`"
+            cat release-assets/checksums.txt
+            echo "\`\`\`"
+            echo ""
+
+            echo "### Assets"
+            echo ""
+            echo "| Asset | Description |"
+            echo "|-------|-------------|"
+            echo "| \`marco-extension-${VER}.zip\` | Chrome extension — load unpacked in \`chrome://extensions\` |"
+            echo "| \`macro-controller-${VER}.zip\` | Standalone macro controller |"
+            echo "| \`marco-sdk-${VER}.zip\` | SDK library |"
+            echo "| \`xpath-${VER}.zip\` | XPath utility |"
+            echo "| \`prompts-${VER}.zip\` | Prompt templates |"
+            echo "| \`changelog.md\` | Full project changelog |"
+            echo "| \`install.ps1\` | Unified PowerShell installer (URL-pinned to this release when fetched here) |"
+            echo "| \`install.sh\` | Unified Bash installer (URL-pinned to this release when fetched here) |"
+            echo "| \`VERSION.txt\` | Version identifier |"
+            echo "| \`checksums.txt\` | SHA256 checksums |"
+            echo ""
+            echo "### Quick Install"
+            echo ""
+            echo "#### 🔒 Pinned to \`${VER}\` (recommended from this page)"
+            echo ""
+            echo "These one-liners download \`install.{ps1,sh}\` from **this release's** assets — the script auto-derives \`${VER}\` from its own URL and installs exactly that version."
+            echo ""
+            echo "**Windows (PowerShell):**"
+            echo "\`\`\`powershell"
+            echo "irm https://github.com/${REPO}/releases/download/${VER}/install.ps1 | iex"
+            echo "\`\`\`"
+            echo ""
+            echo "**Linux / macOS:**"
+            echo "\`\`\`bash"
+            echo "curl -fsSL https://github.com/${REPO}/releases/download/${VER}/install.sh | bash"
+            echo "\`\`\`"
+            echo ""
+            echo "#### 🌊 Latest channel (auto-update)"
+            echo ""
+            echo "These one-liners always resolve the newest published release."
+            echo ""
+            echo "**Windows (PowerShell):**"
+            echo "\`\`\`powershell"
+            echo "irm https://raw.githubusercontent.com/${REPO}/main/scripts/install.ps1 | iex"
+            echo "\`\`\`"
+            echo ""
+            echo "**Linux / macOS:**"
+            echo "\`\`\`bash"
+            echo "curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/install.sh | bash"
+            echo "\`\`\`"
+            echo ""
+            echo "### Manual Install (Chromium)"
+            echo ""
+            echo "1. Download \`marco-extension-${VER}.zip\` from this release."
+            echo "2. Extract it to a local folder."
+            echo "3. Open \`chrome://extensions\`."
+            echo "4. Enable **Developer mode**."
+            echo "5. Click **Load unpacked** and select the extracted folder."
+          } > release-assets/RELEASE_NOTES.md
+
+          cat release-assets/RELEASE_NOTES.md
+
+      # ── Create GitHub Release ─────────────────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.setup.outputs.version }}
+          name: "Marco Extension ${{ needs.setup.outputs.version }}"
+          body_path: release-assets/RELEASE_NOTES.md
+          files: release-assets/*
+          draft: false
+          prerelease: ${{ contains(needs.setup.outputs.version, '-') }}
+          make_latest: ${{ !contains(needs.setup.outputs.version, '-') }}

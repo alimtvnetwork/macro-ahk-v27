@@ -1,0 +1,118 @@
+/**
+ * TEMPLATE — spec/26-chrome-extension-generic/12-templates/index.css.template
+ *
+ * Purpose: HSL semantic token definitions. Dark theme is the default and only
+ *          theme; an optional `:root.light` block is provided for opt-in.
+ *
+ * Last reviewed: 2026-04-24
+ *
+ * Tokens to replace before use: none. Adjust hue/saturation values to taste.
+ *
+ * Rule: components MUST consume these tokens via Tailwind classes
+ * (e.g., `bg-background`, `text-foreground`). Never use raw colours
+ * (e.g., `bg-black`, `text-[#fff]`) in JSX.
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    /* ── Dark (default) ────────────────────────────────────────────── */
+    :root {
+        --background: 222 18% 8%;
+        --foreground: 210 30% 96%;
+
+        --card: 222 18% 11%;
+        --card-foreground: 210 30% 96%;
+
+        --popover: 222 18% 11%;
+        --popover-foreground: 210 30% 96%;
+
+        --primary: 217 91% 60%;
+        --primary-foreground: 222 18% 8%;
+        --primary-glow: 217 91% 70%;
+
+        --secondary: 222 14% 18%;
+        --secondary-foreground: 210 30% 96%;
+
+        --muted: 222 14% 16%;
+        --muted-foreground: 215 16% 65%;
+
+        --accent: 262 83% 65%;
+        --accent-foreground: 222 18% 8%;
+
+        --destructive: 0 72% 55%;
+        --destructive-foreground: 210 30% 96%;
+
+        --warning: 38 92% 55%;
+        --warning-foreground: 222 18% 8%;
+
+        --success: 142 71% 45%;
+        --success-foreground: 222 18% 8%;
+
+        --border: 222 14% 20%;
+        --input: 222 14% 18%;
+        --ring: 217 91% 60%;
+
+        --sidebar-background: 222 20% 6%;
+        --sidebar-foreground: 210 25% 90%;
+        --sidebar-primary: 217 91% 60%;
+        --sidebar-accent: 222 14% 14%;
+        --sidebar-border: 222 14% 16%;
+        --sidebar-ring: 217 91% 60%;
+
+        --radius: 0.625rem;
+
+        --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+        --gradient-subtle: linear-gradient(180deg, hsl(var(--background)), hsl(222 18% 6%));
+
+        --shadow-elegant: 0 10px 30px -10px hsl(var(--primary) / 0.3);
+        --shadow-glow: 0 0 24px hsl(var(--primary) / 0.35);
+    }
+
+    /* ── Optional light theme (opt-in via <html class="light">) ────── */
+    :root.light {
+        --background: 0 0% 100%;
+        --foreground: 222 18% 12%;
+
+        --card: 0 0% 100%;
+        --card-foreground: 222 18% 12%;
+
+        --popover: 0 0% 100%;
+        --popover-foreground: 222 18% 12%;
+
+        --primary: 217 91% 50%;
+        --primary-foreground: 0 0% 100%;
+        --primary-glow: 217 91% 60%;
+
+        --secondary: 210 20% 96%;
+        --secondary-foreground: 222 18% 12%;
+
+        --muted: 210 20% 96%;
+        --muted-foreground: 215 16% 45%;
+
+        --accent: 262 83% 55%;
+        --accent-foreground: 0 0% 100%;
+
+        --destructive: 0 72% 50%;
+        --destructive-foreground: 0 0% 100%;
+
+        --warning: 38 92% 45%;
+        --warning-foreground: 0 0% 100%;
+
+        --success: 142 71% 38%;
+        --success-foreground: 0 0% 100%;
+
+        --border: 215 20% 90%;
+        --input: 215 20% 92%;
+        --ring: 217 91% 50%;
+    }
+
+    * { @apply border-border; }
+
+    body {
+        @apply bg-background text-foreground antialiased;
+        font-feature-settings: "rlig" 1, "calt" 1;
+    }
+}

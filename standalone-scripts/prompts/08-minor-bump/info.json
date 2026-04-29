@@ -1,0 +1,14 @@
+{
+  "Id": "default-minor-bump",
+  "Title": "Minor Bump",
+  "Slug": "minor-bump",
+  "Version": "1.0.0",
+  "Author": "marco",
+  "Categories": [
+    "versioning"
+  ],
+  "IsDefault": true,
+  "Order": 8,
+  "CreatedAt": "2026-01-01T00:00:00Z",
+  "UpdatedAt": "2026-01-01T00:00:00Z"
+}

@@ -1,0 +1,4 @@
+# Memory: features/macro-controller/bulk-rename-system
+Updated: 2026-03-22
+
+The Bulk Rename system (v7.31+) features a draggable, resizable floating panel for asynchronous workspace renaming with a live preview of pending changes and a manual 'Refresh Token' utility. It supports three types of zero-padded numbering variables—$, #, and **—with independent start numbers. The system uses an async worker pattern with configurable delays (100ms–10,000ms) and a rolling-average ETA based on the last 5 operations. The API uses `PUT /user/workspaces/{id}` with body `{"name":"..."}` (matching the official Lovable API pattern). Auth recovery on 401/403 uses `recoverAuthOnce()` for async token refresh before retrying. It also maintains a 20-entry Undo/History stack (ml_rename_history) in local storage.

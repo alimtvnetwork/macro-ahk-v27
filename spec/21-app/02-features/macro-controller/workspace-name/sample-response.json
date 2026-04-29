@@ -1,0 +1,48 @@
+{
+  "$schema": "https://api.lovable.dev/GetUserWorkspaceBody.json",
+  "workspace": {
+    "id": "pCByLpG3pCAcCwWNDdnq",
+    "name": "x Lite 18",
+    "owner_id": "0r96K32fxia89KxNTRk58z0a6gC2",
+    "created_at": "2026-01-23T18:37:36.177521Z",
+    "updated_at": "2026-03-19T19:02:25.86565Z",
+    "plan": "ktlo",
+    "default_project_visibility": "private",
+    "rollover_credits_used": 0,
+    "rollover_credits_limit": 0,
+    "last_rollover_period": null,
+    "credits_used": 0,
+    "credits_granted": 0,
+    "daily_credits_used": 2,
+    "daily_credits_limit": 5,
+    "billing_period_credits_used": 0,
+    "billing_period_credits_limit": 0,
+    "total_credits_used": 5.7,
+    "total_credits_used_in_billing_period": 5.7,
+    "daily_credits_used_in_billing_period": 5.7,
+    "default_monthly_member_credit_limit": null,
+    "topup_credits_used": 0,
+    "topup_credits_limit": 0,
+    "backend_total_used_in_billing_period": 0,
+    "is_personal": true,
+    "num_projects": 0,
+    "referral_count": 0,
+    "data_opt_out": true,
+    "external_publish_permission_level": "member",
+    "is_temporary_edu": true,
+    "experimental_features": {
+      "transactional_credits": true
+    },
+    "followers_count": 0
+  },
+  "current_member": {
+    "user_id": "FP3OOftEhoZ8ebYFGQDXhsaG6Bd2",
+    "username": "alim_ra",
+    "role": "admin",
+    "invited_at": "2026-02-08T07:45:02.839763Z",
+    "email": "alim.karim@riseup-asia.com",
+    "display_name": "Alim",
+    "joined_at": "2026-02-08T07:50:28.549065Z"
+  },
+  "is_member": true
+}

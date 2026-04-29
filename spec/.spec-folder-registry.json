@@ -1,0 +1,223 @@
+{
+  "$schema": "./.spec-folder-registry.schema.json",
+  "version": "1.0.0",
+  "purpose": "Authoritative list of spec/ subfolders that must always exist. Used by scripts/spec-folder-guard.mjs to detect/repair auto-cleanup damage.",
+  "lastVerified": "2026-04-22",
+  "policy": {
+    "sentinelFile": ".lovable-keep",
+    "atRiskDefinition": "Any directory inside spec/ that contains zero direct files (only subdirectories or empty). Sentinels prevent these from being treated as empty.",
+    "neverPrune": [
+      "spec/99-archive/**",
+      "spec/validation-reports/**"
+    ]
+  },
+  "requiredFolders": [
+    {
+      "path": "spec/01-spec-authoring-guide",
+      "kind": "core",
+      "mustHaveOverview": true
+    },
+    {
+      "path": "spec/02-coding-guidelines",
+      "kind": "core",
+      "mustHaveOverview": true
+    },
+    {
+      "path": "spec/03-error-manage",
+      "kind": "core",
+      "mustHaveOverview": true
+    },
+    {
+      "path": "spec/04-database-conventions",
+      "kind": "core",
+      "mustHaveOverview": true
+    },
+    {
+      "path": "spec/05-split-db-architecture",
+      "kind": "core",
+      "mustHaveOverview": true
+    },
+    {
+      "path": "spec/06-seedable-config-architecture",
+      "kind": "core",
+      "mustHaveOverview": true
+    },
+    {
+      "path": "spec/07-design-system",
+      "kind": "core",
+      "mustHaveOverview": true
+    },
+    {
+      "path": "spec/08-docs-viewer-ui",
+      "kind": "core-stub",
+      "mustHaveOverview": true
+    },
+    {
+      "path": "spec/09-code-block-system",
+      "kind": "core-stub",
+      "mustHaveOverview": true
+    },
+    {
+      "path": "spec/10-research",
+      "kind": "core-stub",
+      "mustHaveOverview": true
+    },
+    {
+      "path": "spec/11-powershell-integration",
+      "kind": "core",
+      "mustHaveOverview": true
+    },
+    {
+      "path": "spec/12-cicd-pipeline-workflows",
+      "kind": "core-stub",
+      "mustHaveOverview": true
+    },
+    {
+      "path": "spec/14-update",
+      "kind": "core-stub",
+      "mustHaveOverview": true
+    },
+    {
+      "path": "spec/17-consolidated-guidelines",
+      "kind": "core-stub",
+      "mustHaveOverview": true
+    },
+    {
+      "path": "spec/21-app",
+      "kind": "app-root",
+      "mustHaveOverview": true
+    },
+    {
+      "path": "spec/21-app/02-features",
+      "kind": "app-container",
+      "mustHaveOverview": true
+    },
+    {
+      "path": "spec/21-app/04-design-diagrams",
+      "kind": "app-sparse",
+      "mustHaveOverview": false,
+      "note": "Only contains subdirectory mermaid-design-diagram-spec/ — at-risk"
+    },
+    {
+      "path": "spec/21-app/04-design-diagrams/mermaid-design-diagram-spec",
+      "kind": "app-leaf",
+      "mustHaveOverview": false
+    },
+    {
+      "path": "spec/22-app-issues",
+      "kind": "app",
+      "mustHaveOverview": true
+    },
+    {
+      "path": "spec/23-database",
+      "kind": "core",
+      "mustHaveOverview": true
+    },
+    {
+      "path": "spec/23-database/diagrams",
+      "kind": "core",
+      "mustHaveOverview": false
+    },
+    {
+      "path": "spec/23-database/images",
+      "kind": "core",
+      "mustHaveOverview": false
+    },
+    {
+      "path": "spec/99-archive",
+      "kind": "archive-root",
+      "mustHaveOverview": false,
+      "note": "Always preserve; historical content"
+    },
+    {
+      "path": "spec/99-archive/duplicates",
+      "kind": "archive-container",
+      "mustHaveOverview": false
+    },
+    {
+      "path": "spec/99-archive/duplicates/02-spec-authoring-guide-stale",
+      "kind": "archive-leaf",
+      "mustHaveOverview": false
+    },
+    {
+      "path": "spec/99-archive/duplicates/03-coding-guidelines-stale",
+      "kind": "archive-leaf",
+      "mustHaveOverview": false
+    },
+    {
+      "path": "spec/99-archive/duplicates/04-error-manage-spec-stale",
+      "kind": "archive-leaf",
+      "mustHaveOverview": false
+    },
+    {
+      "path": "spec/99-archive/governance-history",
+      "kind": "archive-leaf",
+      "mustHaveOverview": false
+    },
+    {
+      "path": "spec/99-archive/imported-error-management",
+      "kind": "archive-container",
+      "mustHaveOverview": false
+    },
+    {
+      "path": "spec/99-archive/imported-error-management/error-management",
+      "kind": "archive-leaf",
+      "mustHaveOverview": false
+    },
+    {
+      "path": "spec/99-archive/imported-misc",
+      "kind": "archive-container",
+      "mustHaveOverview": false
+    },
+    {
+      "path": "spec/99-archive/imported-misc/e2-activity-feed",
+      "kind": "archive-leaf",
+      "mustHaveOverview": false
+    },
+    {
+      "path": "spec/99-archive/imported-misc/generic-enforce",
+      "kind": "archive-leaf",
+      "mustHaveOverview": false
+    },
+    {
+      "path": "spec/99-archive/imported-misc/upload-scripts",
+      "kind": "archive-leaf",
+      "mustHaveOverview": false
+    },
+    {
+      "path": "spec/99-archive/imported-powershell-integration",
+      "kind": "archive-container",
+      "mustHaveOverview": false
+    },
+    {
+      "path": "spec/99-archive/imported-powershell-integration/powershell-integration",
+      "kind": "archive-leaf",
+      "mustHaveOverview": false
+    },
+    {
+      "path": "spec/99-archive/wordpress",
+      "kind": "archive-container",
+      "mustHaveOverview": false
+    },
+    {
+      "path": "spec/99-archive/wordpress/wordpress-plugin",
+      "kind": "archive-leaf",
+      "mustHaveOverview": false
+    },
+    {
+      "path": "spec/99-archive/wordpress/wordpress-plugin-development",
+      "kind": "archive-leaf",
+      "mustHaveOverview": false
+    },
+    {
+      "path": "spec/99-archive/wordpress/wp-plugin-publish",
+      "kind": "archive-leaf",
+      "mustHaveOverview": false
+    },
+    {
+      "path": "spec/validation-reports",
+      "kind": "governance",
+      "mustHaveOverview": false
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+# Auto-cleanup safeguard
+
+This sentinel file exists to prevent Lovable's auto-cleanup process from
+pruning this directory. Do not delete it manually — it is regenerated on
+every run of `scripts/spec-folder-guard.mjs`.
+
+If you remove all "real" content from this directory, the sentinel ensures
+the directory itself survives so future restoration is straightforward.
+
+Registry: spec/.spec-folder-registry.json
+Guard:    scripts/spec-folder-guard.mjs

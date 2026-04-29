@@ -1,0 +1,44 @@
+erDiagram
+    Project   ||--o{ StepGroup : "owns"
+    StepGroup ||--o{ StepGroup : "contains (parent → child, max depth 8)"
+    StepGroup ||--o{ Step      : "contains"
+    StepKind  ||--o{ Step      : "classifies"
+    StepGroup ||--o{ Step      : "called by RunGroup (TargetStepGroupId)"
+
+    Project {
+        INTEGER ProjectId PK
+        TEXT    ProjectExternalId
+        TEXT    Name
+        TEXT    CreatedAt
+        TEXT    UpdatedAt
+    }
+
+    StepGroup {
+        INTEGER StepGroupId PK
+        INTEGER ProjectId FK
+        INTEGER ParentStepGroupId FK
+        TEXT    Name
+        TEXT    Description
+        INTEGER OrderIndex
+        INTEGER IsArchived
+        TEXT    CreatedAt
+        TEXT    UpdatedAt
+    }
+
+    StepKind {
+        INTEGER StepKindId PK
+        TEXT    Name
+    }
+
+    Step {
+        INTEGER StepId PK
+        INTEGER StepGroupId FK
+        INTEGER OrderIndex
+        INTEGER StepKindId FK
+        TEXT    Label
+        TEXT    PayloadJson
+        INTEGER TargetStepGroupId FK
+        INTEGER IsDisabled
+        TEXT    CreatedAt
+        TEXT    UpdatedAt
+    }

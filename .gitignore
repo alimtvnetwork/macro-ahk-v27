@@ -1,0 +1,110 @@
+# =============================================================================
+# Core ignores (Node/Next/Python + common tooling)
+# =============================================================================
+
+# OS
+.DS_Store
+
+# IDE / editors
+.idea/
+.vscode/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+lerna-debug.log*
+*.log
+
+# =============================================================================
+# Node.js / package managers
+# =============================================================================
+node_modules/
+.pnp/
+.pnp.js
+
+# Yarn Berry (keep required folders)
+.yarn/*
+!.yarn/patches/
+!.yarn/plugins/
+!.yarn/releases/
+!.yarn/versions/
+!.yarn/sdks/
+.yarn/install-state.gz
+
+# =============================================================================
+# Next.js / TypeScript
+# =============================================================================
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# Build outputs
+dist/
+build/
+
+# Cache
+.cache/
+.turbo/
+.eslintcache
+
+# =============================================================================
+# Environment + secrets (do not commit)
+# =============================================================================
+.env
+.env.*
+*token.json*
+*credentials.json*
+*.pem
+*.key
+
+# =============================================================================
+# Python
+# =============================================================================
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+venv/
+.venv/
+
+# =============================================================================
+# Deployment
+# =============================================================================
+.vercel/
+
+# =============================================================================
+# Project-specific paths
+# =============================================================================
+agenthub/agents/youtube/db/
+marco-script-ahk-v4/logs/
+**/logs/
+**/logs/*.*
+
+# =============================================================================
+# Archives / binaries (optional but typically safe to ignore)
+# =============================================================================
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.deb
+*.dylib
+*.pack
+dump.rdb
+
+marco-script-ahk-v4/logs/activity.txt
+
+/standalone-scripts/_generated
+/chrome-extension
+/standalone-scripts/macro-controller/dist
+/standalone-scripts/_generated
+standalone-scripts/_generated/seed-manifest.json
+.gitmap/release-assets
+release-assets
+standalone-scripts/macro-controller/01-macro-looping.js
+pnpm-workspace.yaml
+pnpm-lock.yaml
+.npmrc
+scripts/check-spec-links.baseline.json

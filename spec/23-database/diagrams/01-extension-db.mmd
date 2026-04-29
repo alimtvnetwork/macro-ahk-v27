@@ -1,0 +1,158 @@
+erDiagram
+    Sessions ||--o{ Logs : "emits"
+    Sessions ||--o{ Errors : "emits"
+    Logs ||--o| Errors : "linked via LogId"
+    Errors }o--|| ErrorCodes : "classified by"
+
+    Prompts ||--o{ PromptsToCategory : "tagged"
+    PromptsCategory ||--o{ PromptsToCategory : "tagged"
+
+    UpdaterInfo ||--o{ UpdaterToCategory : "tagged"
+    UpdaterCategory ||--o{ UpdaterToCategory : "tagged"
+    UpdaterInfo ||--o{ UpdaterEndpoints : "owns"
+    UpdaterInfo ||--o{ UpdaterSteps : "owns"
+
+    SharedAsset ||--o{ AssetVersion : "history"
+
+    Sessions {
+        INTEGER Id PK
+        TEXT    StartedAt
+        TEXT    EndedAt
+        TEXT    Version
+        TEXT    UserAgent
+        TEXT    Notes
+    }
+
+    Logs {
+        INTEGER Id PK
+        INTEGER SessionId FK
+        TEXT    Timestamp
+        TEXT    Level
+        TEXT    Source
+        TEXT    Category
+        TEXT    Action
+        TEXT    LogType
+        INTEGER Indent
+        TEXT    Detail
+        TEXT    Metadata
+        INTEGER DurationMs
+        TEXT    ProjectId
+        TEXT    UrlRuleId
+        TEXT    ScriptId
+        TEXT    ConfigId
+        TEXT    ExtVersion
+    }
+
+    Errors {
+        INTEGER Id PK
+        INTEGER SessionId FK
+        INTEGER LogId FK
+        TEXT    Timestamp
+        TEXT    Level
+        TEXT    Source
+        TEXT    Category
+        TEXT    ErrorCode FK
+        INTEGER Step
+        TEXT    Xpath
+        TEXT    Message
+        TEXT    StackTrace
+        TEXT    Context
+        INTEGER Resolved
+        TEXT    Resolution
+        TEXT    ProjectId
+        TEXT    ScriptFile
+        INTEGER ErrorLine
+        INTEGER ErrorColumn
+        TEXT    ExtVersion
+    }
+
+    ErrorCodes {
+        TEXT Code PK
+        TEXT Severity
+        TEXT Description
+        TEXT Resolution
+    }
+
+    Prompts {
+        INTEGER Id PK
+        TEXT    Slug
+        TEXT    Name
+        TEXT    Text
+        TEXT    Version
+        INTEGER SortOrder
+        INTEGER IsDefault
+        INTEGER IsFavorite
+        TEXT    CreatedAt
+        TEXT    UpdatedAt
+    }
+
+    PromptsCategory {
+        INTEGER Id PK
+        TEXT    Name
+        INTEGER SortOrder
+        TEXT    CreatedAt
+    }
+
+    PromptsToCategory {
+        INTEGER Id PK
+        INTEGER PromptId FK
+        INTEGER CategoryId FK
+    }
+
+    UpdaterInfo {
+        INTEGER Id PK
+        TEXT    Name
+        TEXT    ScriptUrl
+        TEXT    VersionInfoUrl
+        TEXT    CurrentVersion
+        TEXT    LatestVersion
+        INTEGER IsEnabled
+        INTEGER AutoCheckIntervalMinutes
+        TEXT    CreatedAt
+        TEXT    UpdatedAt
+    }
+
+    UpdaterCategory {
+        INTEGER Id PK
+        TEXT    Name
+        INTEGER SortOrder
+        TEXT    CreatedAt
+    }
+
+    UpdaterToCategory {
+        INTEGER Id PK
+        INTEGER UpdaterId FK
+        INTEGER CategoryId FK
+    }
+
+    UpdaterEndpoints {
+        INTEGER Id PK
+        INTEGER UpdaterId FK
+        TEXT    Url
+        INTEGER SortOrder
+        INTEGER ExpectedStatusCode
+    }
+
+    UpdaterSteps {
+        INTEGER Id PK
+        INTEGER UpdaterId FK
+        TEXT    StepId
+        INTEGER SortOrder
+        TEXT    Type
+        TEXT    SourceUrl
+        TEXT    Destination
+    }
+
+    SharedAsset {
+        INTEGER Id PK
+        TEXT    AssetKey
+        TEXT    Content
+        TEXT    UpdatedAt
+    }
+
+    AssetVersion {
+        INTEGER Id PK
+        INTEGER SharedAssetId FK
+        TEXT    Content
+        TEXT    CreatedAt
+    }

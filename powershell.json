@@ -1,0 +1,37 @@
+{
+  "$schema": "spec/99-archive/imported-misc/12-powershell-integration/schemas/powershell.schema.json",
+  "projectName": "Marco Chrome Extension",
+  "rootDir": ".",
+  "extensionDir": ".",
+  "distDir": "chrome-extension",
+  "buildCommand": "pnpm run build:extension",
+  "devCommand": "pnpm run dev",
+  "installCommand": "pnpm install --prod=false",
+  "cleanPaths": [
+    "chrome-extension",
+    "dist",
+    "node_modules",
+    ".vite",
+    ".pnp.cjs"
+  ],
+  "defaultProfile": "Main Account",
+  "browserExePath": "",
+  "chromeUserDataDir": "",
+  "edgeUserDataDir": "",
+  "prerequisites": {
+    "node": true,
+    "pnpm": true
+  },
+  "usePnp": true,
+  "pnpmStorePath": "E:/.pnpm-store",
+  "requiredPackages": ["vite", "tailwindcss", "autoprefixer", "postcss", "@vitejs/plugin-react-swc", "react", "react-dom", "clsx", "class-variance-authority", "tailwind-merge", "lucide-react", "sonner", "next-themes", "react-router-dom"],
+  "standaloneArtifacts": {
+    "baseDir": "standalone-scripts",
+    "required": [
+      { "folder": "marco-sdk", "files": ["marco-sdk.js"] },
+      { "folder": "macro-controller", "files": ["macro-looping.js"] },
+      { "folder": "xpath", "files": ["xpath.js"] }
+    ]
+  }
+}
+

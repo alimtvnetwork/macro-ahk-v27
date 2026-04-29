@@ -1,0 +1,179 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PowerShell Runner Configuration",
+  "description": "Configuration file for the PowerShell build & run script with pnpm support",
+  "type": "object",
+  "required": ["projectName", "backendDir"],
+  "properties": {
+    "projectName": {
+      "type": "string",
+      "description": "Display name for the project shown in console output",
+      "examples": ["WP Plugin Publish", "Spec Management Software", "My App"]
+    },
+    "rootDir": {
+      "type": "string",
+      "default": ".",
+      "description": "Root directory of the project (relative to script location). Empty or '.' means script location is root."
+    },
+    "backendDir": {
+      "type": "string",
+      "description": "Path to Go backend directory containing main.go or cmd/server/main.go",
+      "examples": ["backend", "go-backend", "server", "packages/api"]
+    },
+    "frontendDir": {
+      "type": "string",
+      "default": ".",
+      "description": "Path to React frontend directory containing package.json"
+    },
+    "distDir": {
+      "type": "string",
+      "default": "dist",
+      "description": "Frontend build output directory (relative to frontendDir)"
+    },
+    "targetDir": {
+      "type": "string",
+      "description": "Where to copy built frontend for serving by Go backend",
+      "examples": ["backend/frontend/dist", "server/static", "packages/api/public"]
+    },
+    "dataDir": {
+      "type": "string",
+      "description": "Data directory for SQLite databases and storage files",
+      "examples": ["backend/data", "data", "server/data"]
+    },
+    "ports": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 65535
+      },
+      "default": [8080],
+      "description": "Ports to open in Windows Firewall with -OpenFirewall flag"
+    },
+    "prerequisites": {
+      "type": "object",
+      "properties": {
+        "go": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check/install Go runtime"
+        },
+        "node": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check/install Node.js"
+        },
+        "npm": {
+          "type": "boolean",
+          "default": false,
+          "description": "Verify npm is available (deprecated, use pnpm)"
+        },
+        "pnpm": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check/install pnpm package manager"
+        },
+        "bun": {
+          "type": "boolean",
+          "default": false,
+          "description": "Check/install Bun runtime (alternative to pnpm)"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Which prerequisites to check and auto-install"
+    },
+    "usePnp": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable pnpm Plug'n'Play (PnP) mode for disk-efficient installs"
+    },
+    "pnpmStorePath": {
+      "type": "string",
+      "default": "E:/.pnpm-store",
+      "description": "Path for pnpm shared store. Default: E:/.pnpm-store (shared across all projects).",
+      "examples": ["E:/.pnpm-store", ".pnpm-store", "~/.pnpm-store"]
+    },
+    "cleanPaths": {
+      "type": "array",
+      "items": {"type": "string"},
+      "default": ["node_modules", "dist", ".vite", ".pnp.cjs"],
+      "description": "Paths to remove when using -Force flag. Supports wildcards.",
+      "examples": [
+        ["node_modules", "dist", ".vite", ".pnp.cjs"],
+        ["node_modules", "dist", ".vite", "backend/data/*.db"]
+      ]
+    },
+    "buildCommand": {
+      "type": "string",
+      "default": "pnpm run build",
+      "description": "Command to build the frontend",
+      "examples": ["pnpm run build", "npm run build", "bun run build", "yarn build"]
+    },
+    "installCommand": {
+      "type": "string",
+      "default": "pnpm install",
+      "description": "Command to install frontend dependencies",
+      "examples": ["pnpm install", "npm install", "bun install", "yarn install"]
+    },
+    "runCommand": {
+      "type": "string",
+      "default": "go run cmd/server/main.go",
+      "description": "Command to start the Go backend",
+      "examples": ["go run cmd/server/main.go", "go run main.go", "./server"]
+    },
+    "seedingDir": {
+      "type": "string",
+      "description": "Directory for seed data files (created automatically)",
+      "examples": ["backend/data/seeding", "data/seeds"]
+    },
+    "configFile": {
+      "type": "string",
+      "default": "config.json",
+      "description": "Backend configuration file name"
+    },
+    "configExampleFile": {
+      "type": "string",
+      "default": "config.example.json",
+      "description": "Template config file to copy if main config is missing"
+    },
+    "requiredModules": {
+      "type": "array",
+      "items": {"type": "string"},
+      "default": [],
+      "description": "NPM modules that trigger reinstall if missing (catches new deps after git pull)",
+      "examples": [["react", "lucide-react", "marked"]]
+    },
+    "env": {
+      "type": "object",
+      "additionalProperties": {"type": "string"},
+      "description": "Environment variables to set before running commands",
+      "examples": [{"NODE_ENV": "production", "GO_ENV": "development"}]
+    },
+    "defaultProfile": {
+      "type": "string",
+      "default": "Default",
+      "description": "Chrome/Edge profile folder name or display name to deploy to"
+    },
+    "browserExePath": {
+      "type": "string",
+      "default": "",
+      "description": "Override browser executable path. Use for Chrome for Testing, Chromium, or custom browser installs. When empty, auto-detects based on -e flag.",
+      "examples": [
+        "C:\\chrome-testing\\chrome.exe",
+        "C:\\chromium\\chrome.exe",
+        "D:\\browsers\\chrome-for-testing\\chrome.exe"
+      ]
+    },
+    "chromeUserDataDir": {
+      "type": "string",
+      "default": "",
+      "description": "Override Chrome user data directory. When empty, uses %LOCALAPPDATA%\\Google\\Chrome\\User Data."
+    },
+    "edgeUserDataDir": {
+      "type": "string",
+      "default": "",
+      "description": "Override Edge user data directory. When empty, uses %LOCALAPPDATA%\\Microsoft\\Edge\\User Data."
+    }
+  },
+  "additionalProperties": false
+}

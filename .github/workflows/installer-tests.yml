@@ -1,0 +1,215 @@
+# ──────────────────────────────────────────────────────────────
+# Marco Extension — Installer test pipeline
+#
+# Runs the four-suite installer test bundle (`npm run test:installer`)
+# on Linux (bash + pwsh via apt) and the deferred-delete + Windows-runner
+# real-MoveFileEx E2E on windows-latest.
+#
+# Suites under test:
+#   1. tests/installer/resolver.test.sh        — pure unit (resolve_version,
+#                                                decide_sibling_discovery)
+#   2. tests/installer/mock-server.test.sh     — full pipeline against a
+#                                                local Node mock (AC-3, 4, 5,
+#                                                7, 8, 9, 10, 11, 13)
+#   3. tests/installer/deferred-delete.test.sh — sharing-violation logic
+#   4. tests/installer/deferred-delete-sim.test.sh — P/Invoke surface mocks
+#
+# Spec: spec/14-update/01-generic-installer-behavior.md §5
+# ──────────────────────────────────────────────────────────────
+
+name: Installer Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/install.*'
+      - 'scripts/install.config.*'
+      - 'scripts/installer-contract.json'
+      - 'scripts/installer-constants.*'
+      - 'scripts/check-installer-contract.mjs'
+      - 'scripts/generate-installer-constants.mjs'
+      - 'tests/installer/**'
+      - 'spec/14-update/**'
+      - '.github/workflows/installer-tests.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/install.*'
+      - 'scripts/install.config.*'
+      - 'scripts/installer-contract.json'
+      - 'scripts/installer-constants.*'
+      - 'scripts/check-installer-contract.mjs'
+      - 'scripts/generate-installer-constants.mjs'
+      - 'tests/installer/**'
+      - 'spec/14-update/**'
+      - '.github/workflows/installer-tests.yml'
+
+concurrency:
+  group: installer-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ══════════════════════════════════════════════════════════════
+  # Linux: bash + pwsh (resolver, mock-server, deferred-delete)
+  # ══════════════════════════════════════════════════════════════
+  linux:
+    name: Linux · npm run test:installer
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install PowerShell (pwsh) for cross-platform installer parity
+        run: |
+          # PowerShell ships from Microsoft's apt repo on Ubuntu.
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends wget apt-transport-https software-properties-common
+          source /etc/os-release
+          wget -q "https://packages.microsoft.com/config/ubuntu/${VERSION_ID}/packages-microsoft-prod.deb"
+          sudo dpkg -i packages-microsoft-prod.deb || true
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends powershell
+          pwsh --version
+
+      # ───────────────────────────────────────────────────────────
+      # AC-ID well-formedness + uniqueness gate — runs BEFORE the
+      # drift checker so a malformed/duplicated AC-ID in
+      # installer-contract.json fails fast with a precise report,
+      # rather than silently corrupting the spec mapping that the
+      # drift checker downstream consumes.
+      # ───────────────────────────────────────────────────────────
+      - name: Validate installer-contract AC-IDs (well-formed + unique)
+        run: node scripts/check-installer-contract-acids.mjs
+
+      # ───────────────────────────────────────────────────────────
+      # Drift detector — runs BEFORE the test bundle so a contract
+      # mismatch (install.sh / install.ps1 / installer-constants.{sh,ps1}
+      # vs. installer-contract.json) fails fast. No Node deps required —
+      # the script uses only Node built-ins, so no `npm ci` step needed
+      # here.
+      # Resolves: .lovable/cicd-issues/01-installer-contract-not-in-ci.md
+      # ───────────────────────────────────────────────────────────
+      - name: Check installer contract drift
+        run: node scripts/check-installer-contract.mjs
+
+      # ───────────────────────────────────────────────────────────
+      # Belt-and-braces: actually invoke the generator CLI in-place
+      # and assert `git diff` on the two generated files is empty.
+      # Catches CLI-only failure modes the in-memory drift check
+      # cannot see (cwd handling, EOL drift, side-effects).
+      # ───────────────────────────────────────────────────────────
+      - name: Assert installer-constants regenerate cleanly (git diff)
+        run: node scripts/check-installer-constants-clean.mjs
+
+      - name: Run installer test bundle
+        run: npm run test:installer
+
+  # ══════════════════════════════════════════════════════════════
+  # Windows: real MoveFileEx + PendingFileRenameOperations E2E
+  # ══════════════════════════════════════════════════════════════
+  windows-movefileex-e2e:
+    name: Windows · MoveFileEx real-kernel E2E
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run resolver + decision matrix on PowerShell 7
+        shell: pwsh
+        run: |
+          # The resolver suite is bash-only; on Windows we exercise the
+          # PS-side decision matrix + flag wiring directly.
+          $env:MARCO_INSTALLER_TEST_MODE = "1"
+          . .\scripts\install.ps1
+          $cases = @(
+              @{ Label = "config-off discovery";    IsStrict = $false; ConfigOn = $false; Enable = $false; No = $false; Expected = "off" }
+              @{ Label = "config-on discovery";     IsStrict = $false; ConfigOn = $true;  Enable = $false; No = $false; Expected = "on" }
+              @{ Label = "config-on strict locked"; IsStrict = $true;  ConfigOn = $true;  Enable = $false; No = $false; Expected = "skipped-strict" }
+              @{ Label = "no-flag wins discovery";  IsStrict = $false; ConfigOn = $true;  Enable = $false; No = $true;  Expected = "skipped-cli" }
+              @{ Label = "enable-flag discovery";   IsStrict = $false; ConfigOn = $false; Enable = $true;  No = $false; Expected = "on" }
+              @{ Label = "enable-flag strict lock"; IsStrict = $true;  ConfigOn = $false; Enable = $true;  No = $false; Expected = "skipped-strict" }
+          )
+          $fails = 0
+          foreach ($c in $cases) {
+              $script:SiblingDiscoveryEnabled = if ($c.ConfigOn) { '1' } else { '0' }
+              Set-Variable -Scope Script -Name NoSiblingDiscovery -Value $c.No
+              Set-Variable -Scope Script -Name EnableSiblingDiscovery -Value $c.Enable
+              Decide-SiblingDiscovery $c.IsStrict
+              if ($script:SiblingDecision -ne $c.Expected) {
+                  Write-Host "FAIL $($c.Label): got $script:SiblingDecision expected $($c.Expected)" -ForegroundColor Red
+                  $fails++
+              } else {
+                  Write-Host "PASS $($c.Label)" -ForegroundColor Green
+              }
+          }
+          if ($fails -gt 0) { exit 1 }
+
+      - name: Run deferred-delete simulation suite
+        shell: pwsh
+        run: |
+          # Exercises Test-IsSharingViolation, Test-IsMarcoArtifactLeaf,
+          # Test-IsMarcoMarker, Find-MarcoUpdaterArtifacts, Invoke-PendingDeleteSweep
+          # against the mocked Win32 surface (tests/installer/fixtures/
+          # deferred-delete-simulation.ps1).
+          bash ./tests/installer/deferred-delete-sim.test.sh
+
+      - name: Real MoveFileEx + PendingFileRenameOperations probe
+        shell: pwsh
+        run: |
+          # Verifies the actual Win32 path: rotate a real locked file,
+          # call the real MoveFileEx with MOVEFILE_DELAY_UNTIL_REBOOT,
+          # then confirm the registry key gained an entry pointing at our
+          # rotated path. Cleans up the registry entry afterwards so the
+          # runner image isn't polluted.
+          $env:MARCO_INSTALLER_TEST_MODE = "1"
+          . .\scripts\install.ps1
+
+          $tmp = Join-Path $env:TEMP "marco-e2e-$([guid]::NewGuid().ToString('N').Substring(0,8))"
+          New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+          $victim = Join-Path $tmp 'locked.txt'
+          'lock me' | Set-Content -LiteralPath $victim
+
+          # Open an exclusive handle so Remove-Item fails with sharing violation.
+          $fs = [System.IO.File]::Open($victim, 'Open', 'Read', 'None')
+          try {
+              Remove-PathSafely -Path $victim -Reason "windows e2e sharing-violation"
+          } finally {
+              $fs.Close()
+          }
+
+          # Inspect PendingFileRenameOperations for an entry whose source
+          # leaf matches our canonical .delete-pending-<runId> pattern.
+          $key = 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager'
+          $entries = (Get-ItemProperty -Path $key -Name PendingFileRenameOperations -ErrorAction SilentlyContinue).PendingFileRenameOperations
+          if (-not $entries) { Write-Host "FAIL: no PendingFileRenameOperations entries written" -ForegroundColor Red; exit 1 }
+
+          $matched = $false
+          foreach ($e in $entries) {
+              if ($e -match '\\\..+\.delete-pending-marco-\d{14}-[0-9a-f]{6}$') { $matched = $true; break }
+          }
+          if (-not $matched) {
+              Write-Host "FAIL: PendingFileRenameOperations did not contain a marco rotated path" -ForegroundColor Red
+              $entries | ForEach-Object { Write-Host "  - $_" }
+              exit 1
+          }
+          Write-Host "PASS: real MoveFileEx wrote a canonical-pattern entry to the registry" -ForegroundColor Green
+
+          # Best-effort cleanup of the rotated path + our test registry entry.
+          $kept = $entries | Where-Object { $_ -notmatch '\\\..+\.delete-pending-marco-\d{14}-[0-9a-f]{6}$' }
+          Set-ItemProperty -Path $key -Name PendingFileRenameOperations -Value @($kept) -Type MultiString -ErrorAction SilentlyContinue
+          Get-ChildItem -Path (Split-Path -Parent $victim) -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue

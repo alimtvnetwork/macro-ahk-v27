@@ -1,0 +1,101 @@
+# =====================================================================
+# quality-badges.yml
+#
+# Runs scripts/print-quality-badges.mjs with stored repo secrets and
+# probes each generated badge URL via --check (HEAD then GET retry,
+# follows redirects, reports timing + final resolved URL).
+#
+# Failure modes (all non-zero exit codes fail the job):
+#   1 — bad arguments / missing secrets / readme write target missing
+#   2 — at least one badge URL did not return 200 after the GET retry
+#
+# Required repo secrets (Settings → Secrets and variables → Actions):
+#   CODACY_PROJECT_ID       — Codacy project UUID
+#                             (app.codacy.com → Project → Settings → Integrations → Badges)
+#   CODECLIMATE_REPO_TOKEN  — Code Climate maintainability badge token
+#                             (codeclimate.com → Repo → Settings → Badges)
+#
+# Either secret may be omitted; the job will run with whichever provider
+# is configured. If both are missing, the job fails fast with a clear
+# message instead of silently passing.
+#
+# Triggers:
+#   - Weekly cron (Mondays 03:17 UTC) — catches silent badge-endpoint regressions
+#   - Manual workflow_dispatch — for on-demand verification after activation
+#   - Push to main when the script or this workflow itself changes
+# =====================================================================
+
+name: Quality Badges
+
+on:
+  schedule:
+    # Off-peak, off-the-hour to avoid GitHub cron contention.
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/print-quality-badges.mjs"
+      - ".github/workflows/quality-badges.yml"
+
+# A single in-flight run is enough; cancel older runs on rapid pushes.
+concurrency:
+  group: quality-badges-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check-badges:
+    name: Print + verify badge URLs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Verify at least one secret is configured
+        env:
+          CODACY_PROJECT_ID: ${{ secrets.CODACY_PROJECT_ID }}
+          CODECLIMATE_REPO_TOKEN: ${{ secrets.CODECLIMATE_REPO_TOKEN }}
+        run: |
+          if [ -z "$CODACY_PROJECT_ID" ] && [ -z "$CODECLIMATE_REPO_TOKEN" ]; then
+            echo "::error::Neither CODACY_PROJECT_ID nor CODECLIMATE_REPO_TOKEN is set."
+            echo "Add at least one in Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          # Surface which providers will be checked, without leaking values.
+          [ -n "$CODACY_PROJECT_ID" ]      && echo "✓ Codacy secret present"      || echo "↷ Codacy secret missing — skipping"
+          [ -n "$CODECLIMATE_REPO_TOKEN" ] && echo "✓ Code Climate secret present" || echo "↷ Code Climate secret missing — skipping"
+
+      - name: Run badge script with --check
+        env:
+          CODACY_PROJECT_ID: ${{ secrets.CODACY_PROJECT_ID }}
+          CODECLIMATE_REPO_TOKEN: ${{ secrets.CODECLIMATE_REPO_TOKEN }}
+        run: |
+          # Build the argv conditionally so we don't pass empty flag values
+          # (the script's validators reject empty IDs).
+          args=(--repo "${{ github.repository }}" --branch "${{ github.event.repository.default_branch }}" --check)
+          [ -n "$CODACY_PROJECT_ID" ]      && args+=(--codacy "$CODACY_PROJECT_ID")
+          [ -n "$CODECLIMATE_REPO_TOKEN" ] && args+=(--codeclimate "$CODECLIMATE_REPO_TOKEN")
+
+          # Tee output for the job summary while preserving the script's exit code.
+          set -o pipefail
+          node scripts/print-quality-badges.mjs "${args[@]}" | tee badge-report.txt
+
+      - name: Publish report to job summary
+        if: always()
+        run: |
+          {
+            echo "## Quality badge report"
+            echo ""
+            echo '```'
+            cat badge-report.txt 2>/dev/null || echo "(no report produced)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

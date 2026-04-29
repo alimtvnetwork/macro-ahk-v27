@@ -1,0 +1,2286 @@
+# ──────────────────────────────────────────────────────────────
+# Marco Extension — CI Pipeline (main branch)
+#
+# Pipeline structure:
+#   1. setup        — checkout, install, lint, test
+#   2. build-sdk    — build Marco SDK (dependency for others)
+#   3. build-standalone (parallel) — XPath, Macro Controller, Prompts
+#   4. build-extension — final Chrome extension build
+#
+# Performance: Every job caches the pnpm content-addressable store
+# AND node_modules keyed on pnpm-lock.yaml, so cached runs install
+# in ~10 seconds instead of ~2 minutes. fetch-depth: 1 keeps clones small.
+#
+# NOTE: No email or notification integrations — by design.
+# ──────────────────────────────────────────────────────────────
+
+name: CI Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  # Group by ref (branch or PR head) so a fresh push to the same
+  # branch/PR cancels any in-progress run instead of letting two
+  # commits race to completion. Falls back to SHA for non-branch
+  # events (tags, manual dispatch) so unrelated runs don't collide.
+  group: ci-${{ github.workflow }}-${{ github.ref || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ════════════════════════════════════════════════════════════
+  # Job 0: Spec Links — fail-fast guard, no install needed
+  #
+  # Runs the strict spec-link checker (no baseline, ignores rot)
+  # against every .md file under spec/. Surfaces a Top-N failing-files
+  # leaderboard in the GitHub Actions Step Summary and emits inline
+  # `::error file=…,line=…::` annotations so each broken link shows
+  # up on the PR diff view.
+  #
+  # This job has NO dependencies — it only needs Node + the repo, so
+  # it returns in seconds and blocks the rest of the pipeline before
+  # we burn time on installs/builds. The final `build-extension` job
+  # also lists this job in its `needs:` so a broken link cannot be
+  # merged even if other checks pass.
+  # ════════════════════════════════════════════════════════════
+  spec-links:
+    name: Preflight · Spec Links
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Strict spec-link check (fails on ANY broken link)
+        run: node scripts/report-spec-links-ci.mjs
+
+  # ════════════════════════════════════════════════════════════
+  # Job 0a0b: Nested-template-literal scanner — fast-fail guard
+  #
+  # Targets `standalone-scripts/lovable-common/src/report/run-summary-types.ts`
+  # (and any future entries in TARGETS[] inside the scanner). Hard-pins
+  # the no-nested-template-literals rule for that file even if someone
+  # relaxes the project-wide ESLint sonarjs/* config later.
+  #
+  # No install, no node_modules — pure Node + fs. Returns in <100ms.
+  # Listed in `build-extension.needs:` so a violation blocks merge.
+  # ════════════════════════════════════════════════════════════
+  no-nested-template-literals:
+    name: Preflight · No Nested Template Literals
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Scan for nested template literals
+        run: node scripts/check-no-nested-template-literals.mjs
+
+  # ════════════════════════════════════════════════════════════
+  # Job 0a0c: ESLint pin on run-summary-types.ts
+  #
+  # Belt-and-braces companion to `no-nested-template-literals` above.
+  # The custom scanner is fast (no install, <100ms) but only models
+  # backtick nesting. This job runs the *real* ESLint (eslint.config.js
+  # with `sonarjs/no-nested-template-literals: error`) against the one
+  # file we have promised will never regress, with `--max-warnings=0`
+  # so even the legacy-file `warn` override (if someone ever adds this
+  # path to it) cannot mask a regression here.
+  #
+  # If the rule is ever relaxed project-wide, or the file is moved into
+  # a `warn` override block by mistake, this job goes red — the scanner
+  # alone would still pass, so this second gate is the one that catches
+  # config drift specifically.
+  # ════════════════════════════════════════════════════════════
+  eslint-run-summary-types:
+    name: Preflight · ESLint · run-summary-types.ts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Get pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            standalone-scripts/*/node_modules
+          key: ${{ runner.os }}-nm-ext-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nm-ext-
+
+      - name: Install root dependencies
+        run: pnpm install --prefer-offline --no-frozen-lockfile
+
+      - name: ESLint pinned file (zero warnings, sonarjs nested-template error)
+        run: pnpm run lint:run-summary-types
+
+  # ════════════════════════════════════════════════════════════
+  # Job 0a1: Contract-checker wiring lint — pre-merge guard
+  #
+  # Discovers every `scripts/check-*-contract*.mjs` validator and fails
+  # if any of them is NOT invoked from at least one workflow under
+  # `.github/workflows/**` (directly via `node scripts/<name>.mjs`, or
+  # indirectly via `npm run <script>` whose package.json command runs
+  # the checker).
+  #
+  # Why a separate fast-fail job: a contract checker that is committed
+  # but never wired into CI provides zero protection against drift —
+  # this is exactly what hid `payment-banner-hider` from CI for several
+  # PRs, and what `check-installer-contract.mjs` was almost shipped
+  # without (until manually wired into installer-tests.yml). Catching
+  # this at PR time, before any install or build burns minutes, makes
+  # "you forgot to wire it" a one-line red signal.
+  #
+  # Pure Node + repo files. No deps, returns in <1s. Listed in
+  # build-extension's `needs:` (below) so an orphaned checker blocks
+  # merge even if other jobs pass.
+  # ════════════════════════════════════════════════════════════
+  contract-checkers-wired:
+    name: Preflight · Contract-Checker Wiring
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Assert every scripts/check-*-contract*.mjs is invoked from a workflow
+        run: node scripts/check-contract-checkers-wired.mjs
+
+  # ════════════════════════════════════════════════════════════
+  # Job 0a2b: CI/CD index ↔ cicd-issues drift guard
+  #
+  # Cross-checks `.lovable/cicd-index.md` against the per-issue files
+  # in `.lovable/cicd-issues/*.md` and fails CI on any of:
+  #   - issue file on disk not listed in the index
+  #   - index row pointing to a missing file
+  #   - index column says Active but file's `## Status` is Resolved
+  #     (or vice-versa) — the exact desync that hid issue #01 for
+  #     two days after it was fixed.
+  #
+  # Pure Node + repo files. No install needed, returns in <1s.
+  # Listed in build-extension's `needs:` (below) so a documentation
+  # drift cannot reach main even if downstream builds re-pass.
+  # ════════════════════════════════════════════════════════════
+  cicd-index-sync:
+    name: Preflight · CI/CD Index Sync
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Assert .lovable/cicd-index.md matches cicd-issues/*.md statuses
+        run: node scripts/check-cicd-index-sync.mjs
+
+  # ════════════════════════════════════════════════════════════
+  # Job 0a3: PascalCase instruction migration — fast-fail guard
+  #
+  # Phase 2 of the instruction-manifest migration split the canonical
+  # `dist/instruction.json` (pure PascalCase) from a transitional
+  # `dist/instruction.compat.json` (camelCase snapshot, allowed only
+  # for the vite copyProjectScripts plugin). The migration only holds
+  # if every runtime consumer reads PascalCase keys from the canonical
+  # file. A single regression — a `instruction.displayName` slipping
+  # through — silently returns `undefined`, then gets masked by
+  # `?? defaults` and only surfaces weeks later as a missing script
+  # or empty config injection.
+  #
+  # `scripts/check-pascalcase-instruction-migration.mjs` enforces three
+  # things in one pass with no deps:
+  #
+  #   CHECK A — every standalone-scripts/<name>/src/instruction.ts
+  #             contains only PascalCase object-literal keys.
+  #   CHECK B — instruction.compat.json is read only from the
+  #             documented allowlist (Phase 2c will empty it).
+  #   CHECK C — every file that reads canonical instruction.json
+  #             uses PascalCase property access on instruction-tree
+  #             receivers (`instruction`, `instructionManifest`, …).
+  #
+  # Listed in build-extension's `needs:` (below) so a regression
+  # cannot reach main even if downstream builds re-pass.
+  # ════════════════════════════════════════════════════════════
+  pascalcase-instruction-migration:
+    name: Preflight · PascalCase Instruction Migration
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Assert PascalCase contract on instruction sources + readers
+        run: node scripts/check-pascalcase-instruction-migration.mjs
+
+      - name: Assert PascalCase v4 contract on bundle CREATE TABLE source
+        run: node scripts/check-bundle-schema-contract.mjs
+
+  # ════════════════════════════════════════════════════════════
+  # Job 0a2: Standalone Registry Report — fast-fail orchestration guard
+  #
+  # Runs `scripts/report-standalone-registry.mjs --strict` so the very
+  # first thing visible in the CI log is a checklist of every standalone
+  # script and which orchestration source-of-truth files contain it
+  # (package.json build scripts, build:extension chain, build-standalone,
+  # check-standalone-dist, tsconfig.<name>.json, vite.config.<name>.ts,
+  # CI build-<name> job).
+  #
+  # Strict mode means: if a new bundle is added but only wired into
+  # 5 of the 7 required locations (the recurring failure that hid
+  # `payment-banner-hider` from CI for several PRs), the missing rows
+  # show up as `[X]` AND the job exits 1 with `::error file=…::`
+  # annotations on the offending file — no need to chase a downstream
+  # "artifact missing" error 8 minutes later.
+  #
+  # Also writes a markdown matrix to GITHUB_STEP_SUMMARY so the report
+  # is one click away from the PR checks tab. Listed in build-extension's
+  # `needs:` so a registry gap blocks merge.
+  #
+  # No install needed — pure Node + repo files. Returns in <1s.
+  # ════════════════════════════════════════════════════════════
+  report-standalone-registry:
+    name: Preflight · Standalone Registry (strict)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Preflight · actionable wiring report (prints exact files to create)
+        env:
+          CI: 'true'
+        run: node scripts/preflight-standalone-wiring.mjs
+
+      - name: Strict standalone-registry check (fails on ANY wiring gap)
+        if: always()
+        env:
+          CI: 'true'
+        run: node scripts/report-standalone-registry.mjs --strict
+
+  # ════════════════════════════════════════════════════════════
+  # Job 0a4: Root README conventions — fast-fail guard (path-aware)
+  #
+  # Asserts that `readme.md` complies with the structural rules in
+  # `spec/01-spec-authoring-guide/11-root-readme-conventions.md`:
+  # exactly one H1, centered hero <div> wrapping the logo + H1 +
+  # tagline blockquote + badges, all 5 required badge group markers
+  # (Build & Release / Repo activity / Community / Code-quality /
+  # Stack & standards), ≥5 total badges, properly closed hero before
+  # the first ## section, and a complete Author + Company + License
+  # tail. Regressions here have shipped to main twice already (the
+  # `<h1 align="center">` shortcut and a missing badge-group marker
+  # both slipped through PR review), so we gate it in CI before any
+  # install or build burns minutes.
+  #
+  # Path-aware execution (added 2026-04-25):
+  #   The job ALWAYS RUNS so it can remain a required status check
+  #   (GitHub branch protection treats a `paths:`-skipped job as
+  #   "successful" — which would silently allow a README regression
+  #   to merge whenever any non-README file also changed in the same
+  #   PR; that defeats the gate entirely). Instead, the first step
+  #   detects whether `readme.md` OR either compliance script changed
+  #   in the PR/push diff and exports `changed=true|false`. The two
+  #   compliance steps are gated on `changed == 'true'` so:
+  #     • README touched ⇒ both checkers run, regressions block merge
+  #     • README untouched ⇒ checkers skipped, job exits green in <2s
+  #   The checker scripts themselves are part of the watched paths so
+  #   any change to the rules also re-runs the gate against the
+  #   current README — preventing a silent rule regression.
+  #
+  # Pure Node + repo files. No install needed. Listed in
+  # build-extension's `needs:` (below) so a README regression blocks
+  # merge even if downstream builds re-pass.
+  # ════════════════════════════════════════════════════════════
+  readme-conventions:
+    name: Preflight · Root README Conventions
+    runs-on: ubuntu-latest
+    # dorny/paths-filter calls the GitHub Files API on `pull_request`
+    # events. Explicitly grant `pull-requests: read` so the action
+    # works on fork PRs even if the workflow-level `permissions:`
+    # block is tightened in the future. `contents: read` is needed
+    # for the `push`-event git-diff fallback.
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # fetch-depth: 0 → unshallow clone. Required for two reasons:
+          #   (1) dorny/paths-filter on `push` events runs `git diff
+          #       <base>..<head>` locally, which needs both commits in
+          #       the local history. A shallow clone (the GitHub
+          #       default of depth=1) silently makes that diff return
+          #       empty/garbage when `base` is older than the shallow
+          #       boundary — the exact "incorrectly skip checks"
+          #       failure mode this job must avoid.
+          #   (2) The `Resolve safe diff base` step below uses
+          #       `git cat-file -e` to verify the push event's
+          #       `before` SHA is reachable; that probe is meaningful
+          #       only on a full-history clone.
+          # fetch-depth: 0 is cheap on this repo (<2s) and is the
+          # ONLY reliable way to make `git diff` semantically correct
+          # across force-pushes, branch rewrites, and merge-base drift.
+          fetch-depth: 0
+
+      # ─── Resolve a safe `base` ref for the push-event diff ──────────
+      # On `pull_request` events this step is a no-op — dorny uses
+      # the GitHub Files API and ignores its `base:` input.
+      # On `push` events we must hand dorny a base SHA that is
+      # actually reachable in the local clone. Three failure modes
+      # exist here, all of which would silently skip checks if not
+      # handled:
+      #   A) First push to a new branch → `event.before` is the all-
+      #      zero SHA. `git diff 0000…0000 HEAD` returns empty (no
+      #      ancestor) on some git versions and "everything" on
+      #      others → unreliable.
+      #   B) Force-push that rewrites history → `event.before` no
+      #      longer exists in the remote, so even `fetch-depth: 0`
+      #      can't resolve it. `git diff <missing>..HEAD` errors out
+      #      and dorny would either fail the job red OR (worse, in
+      #      older versions) silently produce empty output.
+      #   C) Branch deletion event (`event.after` is zero) → not
+      #      applicable for our trigger filter (branches: [main]),
+      #      but defensive code costs nothing.
+      #
+      # Resolution policy: when `event.before` is unreachable for any
+      # reason, fall back to an empty `base` — dorny then treats the
+      # entire HEAD tree as changed, which RE-RUNS the README checks.
+      # That is the correct fail-CLOSED-but-run-checks behavior:
+      # we never silently skip, and a README regression still fails
+      # the job red. The 2-second cost of an unnecessary check run
+      # on a force-push is acceptable; a missed regression is not.
+      - name: Resolve safe diff base for push events
+        id: base
+        if: github.event_name == 'push'
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          ZERO='0000000000000000000000000000000000000000'
+          if [ -z "${BEFORE:-}" ] || [ "$BEFORE" = "$ZERO" ]; then
+            echo "First-push or branch-create event (before=$BEFORE)."
+            echo "→ base='' → dorny will treat HEAD as fully changed → checks will run."
+            echo "value=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            echo "Reachable previous SHA: $BEFORE → using as diff base."
+            echo "value=${BEFORE}" >> "$GITHUB_OUTPUT"
+          else
+            echo "Previous SHA $BEFORE not reachable in local history (force-push or rewritten branch)."
+            echo "→ base='' → dorny will treat HEAD as fully changed → checks will run."
+            echo "value=" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ─── Path-aware change detection (dorny/paths-filter) ──────────
+      # Why dorny over a hand-rolled `git diff`:
+      #   • Correctly handles fork PRs — a hand-rolled bash diff has
+      #     no access to the base repo's commits. Dorny uses the
+      #     GitHub Files API on `pull_request` events, which returns
+      #     the authoritative changed-files list regardless of
+      #     fork/base relationship.
+      #   • Pinned to a verified release SHA (v3.0.2) — the SHA pin
+      #     prevents tag-replay supply-chain attacks while still
+      #     letting Dependabot bump it on review.
+      #
+      # Output `steps.changes.outputs.readme` is `'true'` iff any of
+      # the watched paths changed in the PR/push diff. The base SHA
+      # used for `push` events is the one resolved above — guaranteed
+      # to be either a reachable commit OR empty (which makes dorny
+      # treat HEAD as fully changed and run the checks). There is NO
+      # code path where `readme` can be `'false'` due to a degraded
+      # detect step — we either get a real diff or we run the checks.
+      - name: Detect README / checker script changes
+        id: changes
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        with:
+          base: ${{ github.event_name == 'push' && steps.base.outputs.value || '' }}
+          # Filters: any of these paths flips `readme=true`. Keeping
+          # both checker scripts in the watch list ensures a rule
+          # change re-validates the current README on the same PR.
+          filters: |
+            readme:
+              - 'readme.md'
+              - 'scripts/check-readme-compliance.mjs'
+              - 'scripts/check-readme-hero-layout.mjs'
+
+      - name: Setup Node.js
+        if: steps.changes.outputs.readme == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Assert readme.md complies with root-readme conventions
+        if: steps.changes.outputs.readme == 'true'
+        run: node scripts/check-readme-compliance.mjs
+
+      - name: Assert hero/badge/logo markup stays inside the allowed regions
+        if: steps.changes.outputs.readme == 'true'
+        run: node scripts/check-readme-hero-layout.mjs
+
+      - name: No-op summary (readme + checker scripts unchanged)
+        if: steps.changes.outputs.readme != 'true'
+        run: echo "::notice::readme.md and checker scripts unchanged in this PR/push; conventions check skipped (gate stays required and green)."
+
+  #
+  # Runs `tsc --noEmit` against every standalone-script tsconfig
+  # in a single job. Catches TS2304/TS2345/etc errors in seconds
+  # — long before the heavier build-* jobs would surface them
+  # via `pnpm build:macro-controller` (which also runs LESS,
+  # templates, prompts, and vite — masking the type error noise
+  # behind 60+ seconds of unrelated work).
+  #
+  # Caches both pnpm store and node_modules so cached runs install
+  # in ~10s. Lists this job in build-extension's `needs:` so a
+  # type error blocks merges even if downstream builds are re-run.
+  #
+  # Why one job, not four: each tsc invocation is ~3–8s. Spinning
+  # up four runners would burn more time on container startup +
+  # install than the actual checks. Keep them serial in one job.
+  # ════════════════════════════════════════════════════════════
+  typecheck-standalone:
+    name: Preflight · Typecheck (Standalone Scripts)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Get pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            standalone-scripts/*/node_modules
+          key: ${{ runner.os }}-nm-typecheck-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nm-typecheck-
+
+      # ── TypeScript incremental cache ────────────────────────────
+      # tsc writes a `.tsbuildinfo` file per project when invoked
+      # with `--incremental`. On the next run it skips re-checking
+      # files whose inputs haven't changed → 3–5× faster on cache
+      # hits. Cache is keyed on the union of every standalone
+      # tsconfig + the source trees they cover, so any source or
+      # config edit invalidates only when it actually matters.
+      # `restore-keys` lets us fall back to the most recent build
+      # info even on a partial miss (e.g. one file changed).
+      - name: Cache TypeScript incremental build info
+        uses: actions/cache@v4
+        with:
+          path: .cache/tsbuildinfo
+          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('tsconfig.sdk.json', 'tsconfig.xpath.json', 'tsconfig.payment-banner-hider.json', 'tsconfig.macro.build.json', 'standalone-scripts/**/*.ts', 'standalone-scripts/**/*.tsx') }}
+          restore-keys: |
+            ${{ runner.os }}-tsbuildinfo-
+
+      - name: Ensure tsbuildinfo cache dir exists
+        run: mkdir -p .cache/tsbuildinfo
+
+      - name: Install dependencies
+        run: pnpm install --prefer-offline --no-frozen-lockfile
+
+      # Compile each standalone-script tsconfig with --noEmit and
+      # --incremental. The `--tsBuildInfoFile` flag points at a
+      # per-project file inside `.cache/tsbuildinfo/` so all four
+      # checks share one cache directory (single cache action) but
+      # each gets its own buildinfo (no cross-project corruption).
+      # Any TS2304 (missing global), TS2345 (bad arg type), etc.
+      # still fails the job with inline annotations on the offending
+      # line — incremental mode does NOT skip type errors, only
+      # already-validated unchanged files.
+      - name: Typecheck · Marco SDK
+        run: npx tsc --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo/sdk.tsbuildinfo -p tsconfig.sdk.json
+
+      - name: Typecheck · XPath
+        run: npx tsc --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo/xpath.tsbuildinfo -p tsconfig.xpath.json
+
+      - name: Typecheck · Payment Banner Hider
+        run: npx tsc --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo/payment-banner-hider.tsbuildinfo -p tsconfig.payment-banner-hider.json
+
+      - name: Typecheck · Macro Controller
+        run: npx tsc --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo/macro.tsbuildinfo -p tsconfig.macro.build.json
+
+  # ════════════════════════════════════════════════════════════
+  # Job 0b2: Typecheck App (main React app + node tooling)
+  #
+  # Runs `tsc --noEmit` against every project referenced by the root
+  # solution-style `tsconfig.json` (currently `tsconfig.app.json` and
+  # `tsconfig.node.json`). The existing `typecheck-standalone` job
+  # only covers `standalone-scripts/**` — the main `src/**` tree was
+  # NEVER typechecked in CI, which is exactly how
+  # `ParseDeliveryBaseResult`-style mismatches reached main without
+  # tripping a gate.
+  #
+  # Always runs (no `paths:` filter) — the user's directive was
+  # explicit: "ALWAYS runs TypeScript typecheck and fails the build
+  # immediately on any type errors". This job listed in
+  # build-extension's `needs:` so a type error blocks the merge even
+  # if downstream builds happen to be re-run from cache.
+  #
+  # Sequential, fail-fast (Core no-retry policy). First project with
+  # errors aborts the job. Inline `::error::` annotations point at
+  # the offending file:line so PR diff surfaces the issue.
+  #
+  # Cache strategy mirrors typecheck-standalone: shared `.cache/
+  # tsbuildinfo/` directory keyed on the union of every covered
+  # tsconfig + the source trees they cover. Cached cold runs land
+  # in ~10s.
+  # ════════════════════════════════════════════════════════════
+  typecheck-app:
+    name: Preflight · Typecheck (App)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Get pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+          key: ${{ runner.os }}-nm-typecheck-app-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nm-typecheck-app-
+
+      - name: Cache TypeScript incremental build info (app)
+        uses: actions/cache@v4
+        with:
+          path: .cache/tsbuildinfo
+          key: ${{ runner.os }}-tsbuildinfo-app-${{ hashFiles('tsconfig.json', 'tsconfig.app.json', 'tsconfig.node.json', 'src/**/*.ts', 'src/**/*.tsx', 'vite.config.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-tsbuildinfo-app-
+
+      - name: Ensure tsbuildinfo cache dir exists
+        run: mkdir -p .cache/tsbuildinfo
+
+      - name: Install dependencies
+        run: pnpm install --prefer-offline --no-frozen-lockfile
+
+      - name: Strict TypeScript gate (app + node)
+        run: pnpm run typecheck
+
+  # ════════════════════════════════════════════════════════════
+  # Job 0c: ESLint Standalone Scripts — fast-fail lint guard
+  #
+  # Runs ESLint scoped to standalone-scripts/ (macro-controller,
+  # marco-sdk, xpath, payment-banner-hider) with --max-warnings=0
+  # so any new warning fails the build. Surfaces violations as
+  # inline `::error file=…,line=…,col=…::` GitHub annotations on
+  # the PR diff.
+  #
+  # Why a separate job (vs `setup`'s existing `pnpm run lint`):
+  #   - Runs in parallel with setup + typecheck — no waiting for
+  #     tests or installs of build deps to surface lint failures.
+  #   - Scoped to standalone-scripts/ only — quick (~5–8s after
+  #     install) and isolates the noise from React/UI lint output.
+  #   - --max-warnings=0 enforces zero-warnings policy
+  #     (mem://architecture/linting-policy).
+  #
+  # Listed in build-extension's needs: so a lint regression
+  # blocks merge even if other jobs pass.
+  # ════════════════════════════════════════════════════════════
+  lint-standalone:
+    name: Preflight · ESLint (Standalone Scripts)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # fetch-depth: 0 → full history so `git log`/`git rev-parse`
+          # in the diagnostics step have real data, and so any
+          # blame/baseline lint checks see the full ancestry.
+          fetch-depth: 0
+          # clean: true → wipes any pre-existing workspace files
+          # (defense against self-hosted/cached-runner residue) so
+          # ESLint always lints exactly what's at HEAD.
+          clean: true
+          # Always check out the ref the workflow was triggered for,
+          # not a merge commit GitHub may have synthesised.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Get pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            standalone-scripts/*/node_modules
+          key: ${{ runner.os }}-nm-lint-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nm-lint-
+
+      - name: Install dependencies
+        run: pnpm install --prefer-offline --no-frozen-lockfile
+
+      # Diagnostics: print exact commit SHA, Node/pnpm/ESLint versions, and the
+      # lint command line. Makes mismatches between local and CI obvious when
+      # warnings appear to disagree across runs.
+      - name: Lint diagnostics (commit, versions, command)
+        run: |
+          echo "::group::Lint environment diagnostics"
+          echo "Git commit SHA   : ${{ github.sha }}"
+          echo "Git ref          : ${{ github.ref }}"
+          echo "Short SHA        : $(git rev-parse --short HEAD)"
+          echo "HEAD commit      : $(git log -1 --oneline)"
+          echo "Node version     : $(node --version)"
+          echo "pnpm version     : $(pnpm --version)"
+          echo "npx version      : $(npx --version)"
+          echo "ESLint version   : $(npx eslint --version)"
+          echo "ESLint config    : $(ls eslint.config.* 2>/dev/null || echo '(none at root)')"
+          echo "Lint command     : npx eslint standalone-scripts --max-warnings=0 --format=stylish"
+          echo "::endgroup::"
+
+      # Stylish format → human-readable in the Actions log.
+      # Compact format → piped to a one-liner that emits GitHub
+      # annotations so each violation shows up on the PR diff.
+      - name: ESLint · Standalone Scripts (errors + warnings)
+        run: npx eslint standalone-scripts --max-warnings=0 --format=stylish
+
+      - name: ESLint · Macro Controller domain-specific guards
+        run: pnpm run lint:macro
+
+  # ════════════════════════════════════════════════════════════
+  # Job 1: Setup, Lint, Test
+  # ════════════════════════════════════════════════════════════
+  setup:
+    name: Setup · Lint · Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Enforce lowercase .md filenames
+        run: |
+          VIOLATIONS=$(find . -name '*.md' \
+            -not -path './node_modules/*' \
+            -not -path './.git/*' \
+            -not -path './skipped/*' \
+            | grep '[A-Z]' || true)
+          if [ -n "$VIOLATIONS" ]; then
+            echo "::error::Uppercase .md filenames found — all .md files must be lowercase hyphen-case:"
+            echo "$VIOLATIONS"
+            exit 1
+          fi
+          echo "✅ All .md filenames are lowercase"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Preflight · forbid broken pnpm-dlx-less invocation
+        run: node scripts/check-no-pnpm-dlx-less.mjs
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Get pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            standalone-scripts/*/node_modules
+          key: ${{ runner.os }}-nm-setup-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nm-setup-
+
+      - name: Install root dependencies
+        run: pnpm install --prefer-offline --no-frozen-lockfile
+
+      - name: Run root lint
+        run: pnpm run lint
+
+      - name: Run tests
+        run: pnpm run test
+
+  # ════════════════════════════════════════════════════════════
+  # Job 2: Build SDK (dependency for other standalone scripts)
+  # ════════════════════════════════════════════════════════════
+  build-sdk:
+    name: Build · Marco SDK
+    needs: setup
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Get pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            standalone-scripts/*/node_modules
+          key: ${{ runner.os }}-nm-sdk-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nm-sdk-
+
+      - name: Install dependencies
+        run: pnpm install --prefer-offline --no-frozen-lockfile
+
+      - name: Cache standalone build · marco-sdk
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/standalone-builds/marco-sdk
+            .cache/tsbuildinfo/marco-sdk.tsbuildinfo
+          key: ${{ runner.os }}-stdbuild-marco-sdk-${{ hashFiles('standalone-scripts/marco-sdk/src/**', 'standalone-scripts/marco-sdk/instruction.ts', 'standalone-scripts/marco-sdk/package.json', 'tsconfig.marco-sdk.json', 'tsconfig.sdk.json', 'tsconfig.xpath.json', 'tsconfig.macro.build.json', 'tsconfig.payment-banner-hider.json', 'vite.config.marco-sdk.ts', 'vite.config.sdk.ts', 'vite.config.xpath.ts', 'vite.config.macro.ts', 'vite.config.payment-banner-hider.ts', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-stdbuild-marco-sdk-
+
+      - name: Build Marco SDK
+        run: pnpm run build:sdk
+
+      - name: Upload SDK dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-dist
+          path: standalone-scripts/marco-sdk/dist/
+          retention-days: 1
+
+  # ════════════════════════════════════════════════════════════
+  # Job 3a: Build XPath (parallel with 3b, 3c)
+  # ════════════════════════════════════════════════════════════
+  build-xpath:
+    name: Build · XPath
+    needs: build-sdk
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Get pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            standalone-scripts/*/node_modules
+          key: ${{ runner.os }}-nm-xpath-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nm-xpath-
+
+      - name: Install dependencies
+        run: pnpm install --prefer-offline --no-frozen-lockfile
+
+      - name: Download SDK dist
+        uses: actions/download-artifact@v4
+        with:
+          name: sdk-dist
+          path: standalone-scripts/marco-sdk/dist/
+
+      - name: Cache standalone build · xpath
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/standalone-builds/xpath
+            .cache/tsbuildinfo/xpath.tsbuildinfo
+          key: ${{ runner.os }}-stdbuild-xpath-${{ hashFiles('standalone-scripts/xpath/src/**', 'standalone-scripts/xpath/instruction.ts', 'standalone-scripts/xpath/package.json', 'tsconfig.xpath.json', 'tsconfig.sdk.json', 'tsconfig.xpath.json', 'tsconfig.macro.build.json', 'tsconfig.payment-banner-hider.json', 'vite.config.xpath.ts', 'vite.config.sdk.ts', 'vite.config.xpath.ts', 'vite.config.macro.ts', 'vite.config.payment-banner-hider.ts', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-stdbuild-xpath-
+
+      - name: Build XPath
+        run: pnpm run build:xpath
+
+      - name: Upload XPath dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: xpath-dist
+          path: standalone-scripts/xpath/dist/
+          retention-days: 1
+
+  # ════════════════════════════════════════════════════════════
+  # Job 3b: Build Macro Controller (parallel with 3a, 3c)
+  # ════════════════════════════════════════════════════════════
+  build-macro-controller:
+    name: Build · Macro Controller
+    needs: build-sdk
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Get pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            standalone-scripts/*/node_modules
+          key: ${{ runner.os }}-nm-mc-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nm-mc-
+
+      - name: Install dependencies
+        run: pnpm install --prefer-offline --no-frozen-lockfile
+
+      - name: Download SDK dist
+        uses: actions/download-artifact@v4
+        with:
+          name: sdk-dist
+          path: standalone-scripts/marco-sdk/dist/
+
+      # Persist the compiled macro-looping.css across CI runs so we skip
+      # the LESS compile step entirely when no *.less source changed. The
+      # compile-less.mjs helper validates the cached output via a SHA-256
+      # fingerprint sidecar (.cache/macro-looping.css.fingerprint.json),
+      # so a stale cache is detected and recompiled automatically.
+      - name: Cache macro-looping.css (LESS output)
+        uses: actions/cache@v4
+        with:
+          path: |
+            standalone-scripts/macro-controller/dist/macro-looping.css
+            standalone-scripts/macro-controller/dist/.cache
+          key: ${{ runner.os }}-macro-less-${{ hashFiles('standalone-scripts/macro-controller/less/**/*.less', 'scripts/compile-less.mjs', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-macro-less-
+
+      - name: Cache standalone build · macro-controller
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/standalone-builds/macro-controller
+            .cache/tsbuildinfo/macro-controller.tsbuildinfo
+          key: ${{ runner.os }}-stdbuild-macro-controller-${{ hashFiles('standalone-scripts/macro-controller/src/**', 'standalone-scripts/macro-controller/instruction.ts', 'standalone-scripts/macro-controller/package.json', 'tsconfig.macro-controller.json', 'tsconfig.sdk.json', 'tsconfig.xpath.json', 'tsconfig.macro.build.json', 'tsconfig.payment-banner-hider.json', 'vite.config.macro-controller.ts', 'vite.config.sdk.ts', 'vite.config.xpath.ts', 'vite.config.macro.ts', 'vite.config.payment-banner-hider.ts', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-stdbuild-macro-controller-
+
+      - name: Build Macro Controller
+        run: pnpm run build:macro-controller
+
+      - name: Upload Macro Controller dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: macro-controller-dist
+          path: standalone-scripts/macro-controller/dist/
+          retention-days: 1
+
+  # ════════════════════════════════════════════════════════════
+  # Job 3c: Build Prompts (parallel with 3a, 3b)
+  # ════════════════════════════════════════════════════════════
+  build-prompts:
+    name: Build · Prompts
+    needs: setup
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Get pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            standalone-scripts/*/node_modules
+          key: ${{ runner.os }}-nm-prompts-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nm-prompts-
+
+      - name: Install dependencies
+        run: pnpm install --prefer-offline --no-frozen-lockfile
+
+      - name: Build Prompts
+        run: pnpm run build:prompts
+
+      - name: Upload Prompts
+        uses: actions/upload-artifact@v4
+        with:
+          name: prompts-dist
+          path: standalone-scripts/prompts/
+          retention-days: 1
+
+  # ════════════════════════════════════════════════════════════
+  # Job 3d: Build Payment Banner Hider (parallel with 3a/3b/3c)
+  #
+  # No SDK dependency (instruction.ts → dependencies: []), so this
+  # runs straight off `setup` instead of waiting for build-sdk like
+  # build-xpath / build-macro-controller do.
+  #
+  # Listed in build-extension's `needs:` (above, line ~641) so the
+  # extension build can download the `payment-banner-hider-dist`
+  # artifact and pass the strict registry check
+  # (scripts/report-standalone-registry.mjs --strict, location
+  # `ciJob` → `.github/workflows/ci.yml build-payment-banner-hider`).
+  # ════════════════════════════════════════════════════════════
+  build-payment-banner-hider:
+    name: Build · Payment Banner Hider
+    needs: setup
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Get pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            standalone-scripts/*/node_modules
+          key: ${{ runner.os }}-nm-pbh-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nm-pbh-
+
+      - name: Install dependencies
+        run: pnpm install --prefer-offline --no-frozen-lockfile
+
+      - name: Cache standalone build · payment-banner-hider
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/standalone-builds/payment-banner-hider
+            .cache/tsbuildinfo/payment-banner-hider.tsbuildinfo
+          key: ${{ runner.os }}-stdbuild-payment-banner-hider-${{ hashFiles('standalone-scripts/payment-banner-hider/src/**', 'standalone-scripts/payment-banner-hider/instruction.ts', 'standalone-scripts/payment-banner-hider/package.json', 'tsconfig.payment-banner-hider.json', 'tsconfig.sdk.json', 'tsconfig.xpath.json', 'tsconfig.macro.build.json', 'tsconfig.payment-banner-hider.json', 'vite.config.payment-banner-hider.ts', 'vite.config.sdk.ts', 'vite.config.xpath.ts', 'vite.config.macro.ts', 'vite.config.payment-banner-hider.ts', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-stdbuild-payment-banner-hider-
+
+      - name: Build Payment Banner Hider
+        run: pnpm run build:payment-banner-hider
+
+      # Sanity-check the local dist BEFORE uploading. If the build
+      # produced an empty bundle we want to fail HERE (with build
+      # logs in scope), not in build-extension's pre-build assertion
+      # 5 minutes later. Reuses the shared assertion script so the
+      # error format is identical to the downstream check.
+      - name: Self-assert dist (pre-upload)
+        run: |
+          node scripts/assert-standalone-dist.mjs \
+            --script-name payment-banner-hider \
+            --dist-dir standalone-scripts/payment-banner-hider/dist \
+            --bundle payment-banner-hider.js \
+            --artifact-name "payment-banner-hider-dist (pre-upload, local)" \
+            --vite-config standalone-scripts/payment-banner-hider/vite.config.ts \
+            --min-bytes 100
+
+      - name: Upload Payment Banner Hider dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: payment-banner-hider-dist
+          path: standalone-scripts/payment-banner-hider/dist/
+          retention-days: 1
+
+      - name: Build summary
+        if: always()
+        run: |
+          {
+            echo "## 🧱 Build · Payment Banner Hider"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Artifact name | \`payment-banner-hider-dist\` |"
+            echo "| Source path | \`standalone-scripts/payment-banner-hider/dist/\` |"
+            echo "| Consumed by | \`build-extension\`, \`e2e-payment-banner-hider\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ════════════════════════════════════════════════════════════
+  # Job 3e: E2E · Payment Banner Hider
+  #
+  # Standalone smoke test — verifies the freshly-built
+  # payment-banner-hider bundle by importing it in a Node sandbox
+  # and running its instruction-driven self-test. Does NOT need
+  # the full Chrome extension build, so it runs in parallel with
+  # build-extension (saves ~3 min on the critical path).
+  #
+  # Gated by the shared assertion script so we never run the
+  # smoke test on a broken artifact — same precise error annotation
+  # as the build-extension pre-build gate.
+  # ════════════════════════════════════════════════════════════
+  e2e-payment-banner-hider:
+    name: E2E · Payment Banner Hider
+    needs: build-payment-banner-hider
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            standalone-scripts/*/node_modules
+          key: ${{ runner.os }}-nm-pbh-e2e-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nm-pbh-e2e-
+
+      - name: Install dependencies
+        run: pnpm install --prefer-offline --no-frozen-lockfile
+
+      - name: Download Payment Banner Hider dist
+        id: download-pbh
+        uses: actions/download-artifact@v4
+        with:
+          name: payment-banner-hider-dist
+          path: standalone-scripts/payment-banner-hider/dist/
+
+      # Same artifact-trace pattern as build-extension so the smoke
+      # job logs also expose the one-click artifact URL when debugging.
+      - name: Resolve payment-banner-hider artifact URL + id
+        id: trace-pbh-artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ARTIFACT_NAME: payment-banner-hider-dist
+        run: |
+          set -euo pipefail
+          ARTIFACT_JSON=$(gh api \
+            -H "Accept: application/vnd.github+json" \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?per_page=100" \
+            --jq ".artifacts[] | select(.name == \"${ARTIFACT_NAME}\")")
+
+          if [ -z "${ARTIFACT_JSON}" ]; then
+            echo "::error title=Artifact metadata lookup failed::Could not find artifact '${ARTIFACT_NAME}' on run ${GITHUB_RUN_ID}."
+            exit 1
+          fi
+
+          ARTIFACT_ID=$(echo "${ARTIFACT_JSON}" | jq -r '.id')
+          BROWSER_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts/${ARTIFACT_ID}"
+          API_URL=$(echo "${ARTIFACT_JSON}" | jq -r '.archive_download_url')
+
+          echo "artifact_name=${ARTIFACT_NAME}" >> "$GITHUB_OUTPUT"
+          echo "artifact_id=${ARTIFACT_ID}" >> "$GITHUB_OUTPUT"
+          echo "browser_download_url=${BROWSER_URL}" >> "$GITHUB_OUTPUT"
+          echo "archive_download_url=${API_URL}" >> "$GITHUB_OUTPUT"
+
+      - name: Assert payment-banner-hider dist artifact present
+        run: |
+          node scripts/assert-standalone-dist.mjs \
+            --script-name payment-banner-hider \
+            --dist-dir standalone-scripts/payment-banner-hider/dist \
+            --bundle payment-banner-hider.js \
+            --artifact-name "${{ steps.trace-pbh-artifact.outputs.artifact_name }}" \
+            --artifact-id "${{ steps.trace-pbh-artifact.outputs.artifact_id }}" \
+            --artifact-url "${{ steps.trace-pbh-artifact.outputs.browser_download_url }}" \
+            --artifact-api-url "${{ steps.trace-pbh-artifact.outputs.archive_download_url }}" \
+            --vite-config standalone-scripts/payment-banner-hider/vite.config.ts \
+            --min-bytes 100
+
+      - name: Smoke-test bundle in Node sandbox
+        # The bundle is an IIFE that registers itself on window.
+        # Run it under a minimal jsdom-free shim so we get a clear
+        # SyntaxError / ReferenceError if the bundle is malformed,
+        # without booting a full browser.
+        run: |
+          set -euo pipefail
+          node --input-type=module -e "
+            import { readFileSync } from 'node:fs';
+            const bundlePath = 'standalone-scripts/payment-banner-hider/dist/payment-banner-hider.js';
+            const src = readFileSync(bundlePath, 'utf8');
+
+            if (src.length < 100) {
+              console.error('::error::Bundle is suspiciously small (' + src.length + ' bytes)');
+              process.exit(1);
+            }
+
+            // Minimal window/document shim so an IIFE that touches DOM
+            // doesn't crash on load. We only validate the bundle parses
+            // and runs to completion — no behavioural assertion here
+            // (that lives in the Playwright e2e suite).
+            const noop = () => {};
+            const fakeWindow = {
+              addEventListener: noop, removeEventListener: noop,
+              RiseupAsiaMacroExt: { Projects: {} },
+              location: { hostname: 'lovable.dev', href: 'https://lovable.dev/' },
+            };
+            const fakeDocument = {
+              addEventListener: noop, removeEventListener: noop,
+              readyState: 'complete',
+              querySelector: () => null, querySelectorAll: () => [],
+              body: { appendChild: noop }, head: { appendChild: noop },
+              createElement: () => ({ style: {}, setAttribute: noop, appendChild: noop }),
+            };
+            globalThis.window = fakeWindow;
+            globalThis.document = fakeDocument;
+
+            try {
+              new Function(src)();
+              console.log('✅ Bundle loaded and executed without throwing.');
+            } catch (err) {
+              console.error('::error file=' + bundlePath + '::Bundle threw on execution: ' + err.message);
+              process.exit(1);
+            }
+          "
+
+      - name: Smoke summary
+        if: always()
+        run: |
+          {
+            echo "## 🧪 E2E · Payment Banner Hider — smoke result"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Artifact | \`payment-banner-hider-dist\` |"
+            echo "| Bundle | \`standalone-scripts/payment-banner-hider/dist/payment-banner-hider.js\` |"
+            echo "| Source job | \`build-payment-banner-hider\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ════════════════════════════════════════════════════════════
+  # Job 3f: Casing Gate · per-project matrix
+  #
+  # Runs `pnpm run check:instruction-json-casing standalone-scripts/<name>`
+  # ONCE PER PROJECT in a matrix, so the GitHub Actions checks tab
+  # surfaces a separate green/red row per standalone script
+  # (`Casing · marco-sdk`, `Casing · xpath`, …). When a regression
+  # lands, a reviewer immediately sees WHICH project's instruction
+  # JSON drifted — no need to grep through a single combined log.
+  #
+  # Each matrix leg downloads only the one `<name>-dist` artifact it
+  # needs (so a broken upstream `build-xpath` only fails the `xpath`
+  # leg, not all four). The shared no-arg variant of this script
+  # also runs inside `build-extension` as a final sweep — the matrix
+  # is the per-project visibility layer, the in-build call is the
+  # last-line gate before vite copies the JSON files into the
+  # extension bundle.
+  #
+  # Matrix entries are AUTO-DERIVED at runtime by
+  # `scripts/derive-casing-matrix.mjs` from
+  # `scripts/check-standalone-dist.mjs` (`REQUIRED_ARTIFACTS`) — adding
+  # a new project no longer requires hand-editing this matrix block.
+  # The derive script also self-checks that the static `needs:` list
+  # below still covers every derived `build-<name>` job (a fail-fast
+  # safety net for the ONE remaining manual edit, since GitHub Actions
+  # `needs:` cannot be expression-evaluated).
+  # ════════════════════════════════════════════════════════════
+
+  # Job 3f-pre: Derive casing matrix
+  #
+  # Tiny no-install job (~5 s). Reads `REQUIRED_ARTIFACTS` from
+  # `scripts/check-standalone-dist.mjs`, cross-checks that every project
+  # has both `standalone-scripts/<name>/src/instruction.ts` and a
+  # `build-<name>:` (or legacy `build-sdk:`) job in this workflow, then
+  # publishes a `matrix` output that the matrix-fanned-out
+  # `casing-instruction-json` job consumes via `fromJSON()`.
+  derive-casing-matrix:
+    name: "Casing · derive matrix"
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    outputs:
+      matrix: ${{ steps.derive.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Self-check FIRST — if `needs:` of casing-instruction-json drifted
+      # from the derived matrix, fail loudly here rather than letting a
+      # newly-added project silently skip the casing gate at merge time.
+      - name: Self-check static needs:/derived matrix alignment
+        run: node scripts/derive-casing-matrix.mjs --check
+
+      - name: Derive matrix and publish as job output
+        id: derive
+        run: node scripts/derive-casing-matrix.mjs --github-output
+
+  # Job 3f-pre2: Self-test the casing checker's annotation cap.
+  #
+  # The four real `standalone-scripts/*` projects are all clean, so the
+  # `casing-instruction-json` matrix never exercises the truncation
+  # branch in `check-instruction-json-casing.mjs` (per-key annotation
+  # cap = MAX_ANNOTATIONS, default 50). A regression that breaks the
+  # cap (off-by-one summary, unbounded annotations drowning the PR
+  # Files-Changed view, missing summary line, etc.) would slip through
+  # CI silently. This tiny no-install job builds a synthetic project
+  # with > cap PascalCase violations and asserts the exact emitted
+  # annotation shape.
+  #
+  # Wired as a peer of `derive-casing-matrix` so it runs in parallel
+  # and surfaces independently in the Checks tab. Both `pull_request`
+  # and pushes to `main` run it (matches `casing-instruction-json`).
+  # ────────────────────────────────────────────────────────────
+  # Job 3f-pre2a: Path-filter preflight for the self-test.
+  #
+  # The self-test only validates the casing checker's truncation
+  # branch, so it has zero signal when the change doesn't touch:
+  #   • scripts/check-instruction-json-casing.mjs        (the checker)
+  #   • scripts/__tests__/check-instruction-json-casing-truncation*.test.mjs
+  #     (the fixtures it runs)
+  #   • .github/workflows/ci.yml                          (the job def)
+  #
+  # Skipping it on unrelated PRs (UI tweaks, copy edits, image swaps)
+  # saves ~10 s of runner time per PR and removes a redundant green
+  # check from the PR Checks tab. We keep it zero-dep — pure git +
+  # bash, no third-party action — to match the style of the other
+  # preflight jobs above.
+  #
+  # On `push to main` the BEFORE SHA may be the zero-SHA on a
+  # newly-pushed branch's first commit; in that case we conservatively
+  # mark the paths as changed so the self-test still runs.
+  # ────────────────────────────────────────────────────────────
+  casing-checker-self-test-paths:
+    name: "Casing · self-test (paths preflight)"
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    outputs:
+      changed: ${{ steps.filter.outputs.changed }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Need history to diff PR head vs base, or push HEAD vs BEFORE.
+          fetch-depth: 0
+
+      - name: Detect changes to checker / fixtures / workflow
+        id: filter
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+
+          # Resolve the diff range based on event type.
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            RANGE="$BASE_SHA...$HEAD_SHA"
+          else
+            # push: BEFORE may be 000…0 on the first push of a branch.
+            if [ -z "${BEFORE_SHA:-}" ] || [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              echo "First-push (no BEFORE SHA) — running self-test conservatively."
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            RANGE="$BEFORE_SHA...${GITHUB_SHA}"
+          fi
+
+          echo "Diffing range: $RANGE"
+          CHANGED_FILES="$(git diff --name-only "$RANGE" || true)"
+          echo "$CHANGED_FILES"
+
+          # Match: the checker, its truncation tests, and this workflow.
+          if echo "$CHANGED_FILES" | grep -E -q \
+            -e '^scripts/check-instruction-json-casing\.mjs$' \
+            -e '^scripts/__tests__/check-instruction-json-casing-truncation(-snapshot)?\.test\.mjs$' \
+            -e '^\.github/workflows/ci\.yml$'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Relevant files changed → self-test will run."
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No relevant files changed → self-test will be skipped."
+          fi
+
+  casing-checker-self-test:
+    name: "Casing · checker self-test (truncation)"
+    runs-on: ubuntu-latest
+    needs: casing-checker-self-test-paths
+    # Run only when the paths preflight detected a change to the
+    # checker, its truncation tests, or this workflow file.
+    if: needs.casing-checker-self-test-paths.outputs.changed == 'true'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Zero-dep test (uses `node:test` from Node 20 stdlib). No
+      # `pnpm install` needed — keeps this job under ~10 s end-to-end.
+      - name: Run truncation fixture tests (counts + line snapshot)
+        run: node --test scripts/__tests__/check-instruction-json-casing-truncation.test.mjs scripts/__tests__/check-instruction-json-casing-truncation-snapshot.test.mjs
+
+  # ════════════════════════════════════════════════════════════
+  # Casing matrix — validate instruction.json casing per project
+  # (Referenced by build-extension `needs:` as `casing-instruction-json`.)
+  # ════════════════════════════════════════════════════════════
+  casing-instruction-json:
+    name: "Casing · ${{ matrix.project }}"
+    runs-on: ubuntu-latest
+    # Restrict to the two events that gate merges to main:
+    #   • pull_request → catches drift before review.
+    #   • push to main → catches drift on direct pushes / merges.
+    # Any future trigger added to the workflow (workflow_dispatch,
+    # schedule, release, etc.) will SKIP this job — the casing gate
+    # only matters at merge time, so running it on an ad-hoc
+    # workflow_dispatch or nightly cron just wastes runner minutes.
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    needs:
+      # NOTE: `needs:` MUST be literal YAML (GitHub Actions does not
+      # expand expressions here). When you add a new project to
+      # `REQUIRED_ARTIFACTS`, also add its `build-<name>` job below.
+      # The `derive-casing-matrix` job's `--check` step will fail CI
+      # if these two lists drift, so this is a soft-required edit.
+      - derive-casing-matrix
+      - build-sdk
+      - build-xpath
+      - build-payment-banner-hider
+      - build-macro-controller
+
+    strategy:
+      # Don't short-circuit the other legs when one project fails —
+      # we want EVERY failing project surfaced in the same run so a
+      # multi-project regression doesn't require N CI re-runs to
+      # uncover.
+      fail-fast: false
+      matrix:
+        # Auto-derived from REQUIRED_ARTIFACTS. See the
+        # `derive-casing-matrix` job above and
+        # `scripts/derive-casing-matrix.mjs` for the source of truth.
+        include: ${{ fromJSON(needs.derive-casing-matrix.outputs.matrix) }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      # No install needed — the script is zero-dep node. Skipping
+      # `pnpm install` keeps each matrix leg under ~15 s end-to-end.
+
+      - name: Download ${{ matrix.project }} dist
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.dist-path }}
+
+      # ── Early failsafe: assert the artifact actually unpacked. ─────
+      # Without this guard a missing or empty artifact (typo in the
+      # `artifact:` matrix key, an upstream build job that exited 0
+      # without emitting `dist/`, a retention-window expiry on a
+      # re-run, etc.) would slip past `download-artifact@v4` (which
+      # only fails when the named artifact is missing entirely — an
+      # *empty* artifact, or one where the dist-path folder is absent
+      # post-download, exits 0 silently). The casing checker would
+      # then run, see no `dist/instruction.json`, treat the project as
+      # "missing artifacts" and exit 2 — surfacing as a confusing
+      # generic failure 30 s later instead of a one-line root cause.
+      #
+      # This step fails immediately with a precise `::error` annotation
+      # naming the missing folder + both expected files, so the PR
+      # Checks tab shows the exact reason in red without anyone
+      # having to scroll the log. `exit 1` short-circuits the rest of
+      # the matrix leg (validate, publish-summary) — those steps would
+      # all repeat the same error in different shapes.
+      - name: Assert downloaded dist artifact is present and complete
+        run: |
+          DIST="${{ matrix.dist-path }}"
+          ARTIFACT="${{ matrix.artifact }}"
+          PROJECT="${{ matrix.project }}"
+          CANONICAL="$DIST/instruction.json"
+          COMPAT="$DIST/instruction.compat.json"
+
+          MISSING=()
+
+          if [ ! -d "$DIST" ]; then
+            echo "::error file=.github/workflows/ci.yml,title=Missing dist folder after artifact download::Project '$PROJECT' — expected dist folder '$DIST' does not exist after downloading artifact '$ARTIFACT'. Upstream build job (build-${PROJECT}) may have exited 0 without emitting dist/, OR the artifact name is mis-mapped in the matrix include block. Fix the upstream build OR correct the matrix entry { project: $PROJECT, artifact: $ARTIFACT, dist-path: $DIST }."
+            exit 1
+          fi
+
+          if [ ! -f "$CANONICAL" ]; then MISSING+=("$CANONICAL (canonical PascalCase)"); fi
+          if [ ! -f "$COMPAT" ];    then MISSING+=("$COMPAT (transitional camelCase snapshot)"); fi
+
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            # Show what DID land so the human can tell apart "build
+            # ran but produced wrong outputs" from "build silently
+            # skipped compile-instruction.mjs".
+            echo "Contents of '$DIST' after download:"
+            ls -la "$DIST" || true
+            for m in "${MISSING[@]}"; do
+              echo "::error file=$DIST,title=Missing instruction artifact after download::Project '$PROJECT' — required file '$m' is missing from artifact '$ARTIFACT'. Likely cause: build-${PROJECT} did not run scripts/compile-instruction.mjs (which dual-emits both files). See mem://architecture/instruction-dual-emit-phase-2b.md."
+            done
+            exit 1
+          fi
+
+          echo "✅ Artifact '$ARTIFACT' downloaded and unpacked into '$DIST':"
+          echo "   • $CANONICAL ($(stat -c%s "$CANONICAL") bytes)"
+          echo "   • $COMPAT ($(stat -c%s "$COMPAT") bytes)"
+
+      - name: Validate ${{ matrix.project }} instruction casing
+        run: node scripts/check-instruction-json-casing.mjs standalone-scripts/${{ matrix.project }}
+
+      # Passing-state summary. Only runs when the validator above
+      # exited 0, so the appearance of this line in the log is a
+      # positive signal — both files were scanned and conform to
+      # their respective casing standard. Spells out the exact
+      # contract so a reviewer scanning the log doesn't have to
+      # cross-reference mem://standards/pascalcase-json-keys.
+      - name: ✅ Casing standards validated for ${{ matrix.project }}
+        if: success()
+        run: |
+          echo "✅ Casing standards validated for '${{ matrix.project }}':"
+          echo "   • dist/instruction.json        — PascalCase keys only (canonical)"
+          echo "   • dist/instruction.compat.json — camelCase keys only (transitional snapshot)"
+          echo "   See: mem://standards/pascalcase-json-keys, mem://architecture/instruction-dual-emit-phase-2b.md"
+
+      # Run again in --json mode and stash the report on the run
+      # summary so a failed leg has a parseable artefact attached
+      # without re-running the workflow. Always-on so a passing leg
+      # also publishes its (empty-violation) baseline for trend
+      # tracking. The header line above the JSON block restates the
+      # casing contract explicitly so the GITHUB_STEP_SUMMARY page
+      # is self-documenting on both pass and fail.
+      - name: Publish JSON report to step summary
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          ICON="✅"
+          if [ "$STATUS" != "success" ]; then ICON="❌"; fi
+          {
+            echo "### ${ICON} Casing report — \`${{ matrix.project }}\`"
+            echo ""
+            echo "**Standards enforced:**"
+            echo "- \`dist/instruction.json\` → PascalCase keys only (canonical)"
+            echo "- \`dist/instruction.compat.json\` → camelCase keys only (transitional snapshot)"
+            echo ""
+            echo '```json'
+            node scripts/check-instruction-json-casing.mjs --json standalone-scripts/${{ matrix.project }} || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ════════════════════════════════════════════════════════════
+  # Job 4: Build Chrome Extension (depends on all standalone)
+  # ════════════════════════════════════════════════════════════
+  build-extension:
+    name: Build · Chrome Extension
+    needs: [spec-links, no-nested-template-literals, eslint-run-summary-types, contract-checkers-wired, cicd-index-sync, pascalcase-instruction-migration, report-standalone-registry, readme-conventions, typecheck-app, typecheck-standalone, lint-standalone, build-sdk, build-xpath, build-payment-banner-hider, build-macro-controller, build-prompts, casing-instruction-json]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Get pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            standalone-scripts/*/node_modules
+          key: ${{ runner.os }}-nm-ext-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nm-ext-
+
+      - name: Install root dependencies
+        run: pnpm install --prefer-offline --no-frozen-lockfile
+
+      - name: Download SDK dist
+        uses: actions/download-artifact@v4
+        with:
+          name: sdk-dist
+          path: standalone-scripts/marco-sdk/dist/
+
+      - name: Download XPath dist
+        uses: actions/download-artifact@v4
+        with:
+          name: xpath-dist
+          path: standalone-scripts/xpath/dist/
+
+      - name: Download Macro Controller dist
+        uses: actions/download-artifact@v4
+        with:
+          name: macro-controller-dist
+          path: standalone-scripts/macro-controller/dist/
+
+      - name: Download Prompts
+        uses: actions/download-artifact@v4
+        with:
+          name: prompts-dist
+          path: standalone-scripts/prompts/
+
+      - name: Download Payment Banner Hider dist
+        id: download-payment-banner-hider
+        uses: actions/download-artifact@v4
+        with:
+          name: payment-banner-hider-dist
+          path: standalone-scripts/payment-banner-hider/dist/
+
+      # ── Artifact traceability ───────────────────────────────────
+      # When a downstream step says "bundle missing", the first
+      # question is always: WHICH artifact did we actually pull?
+      # Resolve the exact `artifact-id` and `archive_download_url`
+      # via the GitHub REST API and print them so a reviewer can
+      # one-click open the artifact in the Actions UI without having
+      # to grep through the run page. Also exported as step outputs
+      # so later steps can reference them in their own summaries.
+      - name: Resolve payment-banner-hider artifact URL + id
+        id: trace-payment-banner-hider-artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ARTIFACT_NAME: payment-banner-hider-dist
+        run: |
+          set -euo pipefail
+
+          echo "── Resolving artifact metadata for '${ARTIFACT_NAME}' ──"
+          echo "   repo:    ${GITHUB_REPOSITORY}"
+          echo "   run_id:  ${GITHUB_RUN_ID}"
+
+          # List artifacts for this run, pick the one we just downloaded.
+          # Using `gh api` (preinstalled on ubuntu runners) keeps this
+          # zero-dep — no extra `actions/github-script` setup required.
+          ARTIFACT_JSON=$(gh api \
+            -H "Accept: application/vnd.github+json" \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?per_page=100" \
+            --jq ".artifacts[] | select(.name == \"${ARTIFACT_NAME}\")")
+
+          if [ -z "${ARTIFACT_JSON}" ]; then
+            echo "::error title=Artifact metadata lookup failed::Could not find artifact '${ARTIFACT_NAME}' on run ${GITHUB_RUN_ID}. The download step reported success but the API does not list it — this usually means the upload step in 'build-payment-banner-hider' did not run or used a different name."
+            exit 1
+          fi
+
+          ARTIFACT_ID=$(echo "${ARTIFACT_JSON}" | jq -r '.id')
+          ARTIFACT_SIZE=$(echo "${ARTIFACT_JSON}" | jq -r '.size_in_bytes')
+          ARTIFACT_SHA=$(echo "${ARTIFACT_JSON}" | jq -r '.workflow_run.head_sha // "unknown"')
+          ARTIFACT_EXPIRES=$(echo "${ARTIFACT_JSON}" | jq -r '.expires_at')
+          # `archive_download_url` is the API URL (requires auth).
+          # The browser-friendly URL is the one humans can click.
+          ARCHIVE_DOWNLOAD_URL=$(echo "${ARTIFACT_JSON}" | jq -r '.archive_download_url')
+          BROWSER_DOWNLOAD_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts/${ARTIFACT_ID}"
+
+          echo "✅ Artifact resolved"
+          echo "   artifact_name:        ${ARTIFACT_NAME}"
+          echo "   artifact_id:          ${ARTIFACT_ID}"
+          echo "   size_in_bytes:        ${ARTIFACT_SIZE}"
+          echo "   head_sha:             ${ARTIFACT_SHA}"
+          echo "   expires_at:           ${ARTIFACT_EXPIRES}"
+          echo "   archive_download_url: ${ARCHIVE_DOWNLOAD_URL}"
+          echo "   browser_download_url: ${BROWSER_DOWNLOAD_URL}"
+
+          # Export for later steps (e.g. the assertion summary table).
+          {
+            echo "artifact_name=${ARTIFACT_NAME}"
+            echo "artifact_id=${ARTIFACT_ID}"
+            echo "artifact_size=${ARTIFACT_SIZE}"
+            echo "archive_download_url=${ARCHIVE_DOWNLOAD_URL}"
+            echo "browser_download_url=${BROWSER_DOWNLOAD_URL}"
+          } >> "$GITHUB_OUTPUT"
+
+          # Top-of-summary block so the trace is the FIRST thing a
+          # reviewer sees on a failed run, not buried after build logs.
+          {
+            echo "## 🔗 Artifact trace — \`${ARTIFACT_NAME}\`"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Artifact name | \`${ARTIFACT_NAME}\` |"
+            echo "| Artifact ID | \`${ARTIFACT_ID}\` |"
+            echo "| Size (bytes) | \`${ARTIFACT_SIZE}\` |"
+            echo "| Head SHA | \`${ARTIFACT_SHA}\` |"
+            echo "| Expires at | \`${ARTIFACT_EXPIRES}\` |"
+            echo "| Browser URL (one-click) | [${BROWSER_DOWNLOAD_URL}](${BROWSER_DOWNLOAD_URL}) |"
+            echo "| API archive URL | \`${ARCHIVE_DOWNLOAD_URL}\` |"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # ── Pre-build artifact assertion ────────────────────────────
+      # Hard gate run BEFORE `pnpm run build:extension` so a missing
+      # payment-banner-hider artifact fails fast with a precise
+      # error pointing at the exact file the extension build expects.
+      # Uses the shared `scripts/assert-standalone-dist.mjs` helper
+      # so the same precise failure pattern can be reused for every
+      # other standalone artifact (sdk, xpath, macro-controller, …)
+      # by adding one short step per artifact instead of duplicating
+      # 60 lines of inline shell.
+      - name: Assert payment-banner-hider dist artifact present
+        run: |
+          node scripts/assert-standalone-dist.mjs \
+            --script-name payment-banner-hider \
+            --dist-dir standalone-scripts/payment-banner-hider/dist \
+            --bundle payment-banner-hider.js \
+            --artifact-name "${{ steps.trace-payment-banner-hider-artifact.outputs.artifact_name }}" \
+            --artifact-id "${{ steps.trace-payment-banner-hider-artifact.outputs.artifact_id }}" \
+            --artifact-url "${{ steps.trace-payment-banner-hider-artifact.outputs.browser_download_url }}" \
+            --artifact-api-url "${{ steps.trace-payment-banner-hider-artifact.outputs.archive_download_url }}" \
+            --vite-config standalone-scripts/payment-banner-hider/vite.config.ts \
+            --min-bytes 100
+
+      # ── Casing gate on downloaded standalone dists ──────────────
+      # Validates every standalone-scripts/<name>/dist/instruction.json
+      # (PascalCase only) and dist/instruction.compat.json (camelCase
+      # only) BEFORE `pnpm run build:extension` invokes vite, whose
+      # copyProjectScripts plugin copies these JSON files into
+      # chrome-extension/projects/scripts/<name>/. Catching a casing
+      # regression here means the wrong-shape JSON never reaches the
+      # extension bundle. The same script also runs inline inside
+      # every build:* chain (defence in depth) — this explicit CI
+      # step makes the gate visible in the Actions UI as a separate
+      # green/red check rather than buried inside the build log.
+      - name: Validate instruction.json casing (PascalCase) + compat (camelCase)
+        run: pnpm run check:instruction-json-casing
+
+      # Passing-state summary — only emits when the validator above
+      # exited 0. Spells out the contract enforced across all four
+      # standalone projects so a reviewer scrolling the build log
+      # gets a positive confirmation instead of just absence-of-error.
+      - name: ✅ Casing standards validated for all standalone projects
+        if: success()
+        run: |
+          echo "✅ Casing standards validated across all standalone-scripts/*/dist artifacts:"
+          echo "   • dist/instruction.json        — PascalCase keys only (canonical)"
+          echo "   • dist/instruction.compat.json — camelCase keys only (transitional snapshot)"
+          {
+            echo "### ✅ Build-extension casing gate"
+            echo ""
+            echo "All four standalone projects passed before vite copied JSON into the extension bundle:"
+            echo "- \`dist/instruction.json\` → **PascalCase keys only** (canonical)"
+            echo "- \`dist/instruction.compat.json\` → **camelCase keys only** (transitional snapshot)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build Chrome extension
+        run: pnpm run build:extension
+
+      - name: Verify no source maps in dist
+        run: |
+          MAP_FILES=$(find chrome-extension/dist -name '*.map' 2>/dev/null || true)
+          if [ -n "$MAP_FILES" ]; then
+            echo "::error::Source map files found in dist — production builds must not include .map files:"
+            echo "$MAP_FILES"
+            exit 1
+          fi
+          echo "✅ No source map files in dist"
+
+      # Upload the bundled extension folder so downstream jobs (CSP verifier,
+      # any future browser-based smoke tests) can validate the exact artifact
+      # without re-running the full build.
+      - name: Upload Chrome extension dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrome-extension-dist
+          path: chrome-extension/
+          retention-days: 1
+
+      - name: Build summary
+        run: |
+          echo "=== CI Build Complete ==="
+          echo "Commit: ${GITHUB_SHA:0:8}"
+          echo "Lint: OK | Tests: OK | Build: OK | No source maps: OK"
+
+  # ════════════════════════════════════════════════════════════
+  # Job 5: Verify Built Manifest CSP — early gate for browser-based jobs
+  #
+  # Runs the post-build CSP guard against the EXACT chrome-extension/
+  # artifact produced by build-extension. Fails fast if
+  # `content_security_policy.extension_pages` is missing
+  # `'wasm-unsafe-eval'`, which would crash sql.js at runtime with a
+  # CompileError under MV3's default `script-src 'self'`.
+  #
+  # Any future browser-based smoke test (Playwright, headless Chrome
+  # MV3 load, etc.) MUST list this job in its `needs:` so we never burn
+  # browser-runner minutes on a build that can't boot the extension.
+  # ════════════════════════════════════════════════════════════
+  verify-built-manifest-csp:
+    name: Verify · Built manifest CSP (wasm-unsafe-eval)
+    needs: build-extension
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Download built Chrome extension
+        uses: actions/download-artifact@v4
+        with:
+          name: chrome-extension-dist
+          path: chrome-extension/
+
+      - name: Show built manifest (for log auditability)
+        run: |
+          echo "─── chrome-extension/manifest.json ───"
+          if [ ! -f chrome-extension/manifest.json ]; then
+            echo "::error::chrome-extension/manifest.json missing in downloaded artifact"
+            ls -la chrome-extension/ || true
+            exit 1
+          fi
+          # Keep the printed snippet small but include the CSP block.
+          node -e "const m=require('./chrome-extension/manifest.json'); console.log(JSON.stringify({version:m.version,name:m.name,content_security_policy:m.content_security_policy},null,2));"
+
+      - name: Scan built manifest for wasm-unsafe-eval (script-only fallback)
+        # Belt-and-braces: a pure shell grep so even if the Node validator
+        # below is broken, this step still catches a missing directive.
+        run: |
+          if ! grep -F "'wasm-unsafe-eval'" chrome-extension/manifest.json > /dev/null; then
+            echo "::error file=chrome-extension/manifest.json::Built manifest is missing 'wasm-unsafe-eval' in content_security_policy.extension_pages — sql.js will fail to compile its WASM at runtime under the default MV3 CSP."
+            exit 1
+          fi
+          echo "✅ grep: 'wasm-unsafe-eval' present in built manifest"
+
+      - name: Run check-built-manifest-csp validator
+        # Authoritative check — same script developers run locally
+        # (pnpm run check:built-csp) and that build:extension chains.
+        run: node scripts/check-built-manifest-csp.mjs
+
+  # ════════════════════════════════════════════════════════════
+  # Job 6: E2E — Playwright + headed Chromium under xvfb
+  #
+  # Closes the carried-over E2E verification gap from
+  # `.lovable/pending-issues/02-e2e-verification-react-ui.md`.
+  #
+  # Chrome extensions REQUIRE a real headed Chromium with
+  # `--load-extension`; Playwright's headless-shell cannot load them.
+  # We use the full chromium browser and drive it under xvfb-run on
+  # Linux runners. Spec coverage (74 tests / 22 files) covers all 10
+  # checklist items: popup, options, project CRUD, scripts CRUD,
+  # XPath recorder, log export, SQLite import/export, context menus,
+  # hot-reload, preview env. See `tests/e2e/`.
+  #
+  # Gates: needs the same artifact path as verify-built-manifest-csp
+  # so we never spin up a browser on a build that can't boot.
+  # ════════════════════════════════════════════════════════════
+  e2e:
+    name: E2E · Playwright (Chrome extension)
+    needs: [build-extension, verify-built-manifest-csp]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install dependencies
+        run: pnpm install --prefer-offline --no-frozen-lockfile
+
+      - name: Download built Chrome extension
+        uses: actions/download-artifact@v4
+        with:
+          name: chrome-extension-dist
+          path: dist/
+
+      - name: Install Playwright browsers (chromium + system deps)
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Install xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      - name: Run Playwright E2E suite under xvfb
+        env:
+          CI: 'true'
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24" pnpm exec playwright test
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: test-results/html
+          retention-days: 7
+
+      - name: Upload Playwright artifacts (traces, videos, screenshots)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: test-results/artifacts
+          retention-days: 7
+
+  # ════════════════════════════════════════════════════════════
+  # Registry-required build stubs.
+  #
+  # These jobs satisfy the strict standalone registry checker
+  # (`scripts/report-standalone-registry.mjs --strict`) which requires a
+  # `build-<scriptName>:` job for every project under standalone-scripts/.
+  # They run the dedicated `pnpm run build:<name>` script and upload the
+  # resulting dist as a `<name>-dist` artifact for downstream consumers.
+  # ════════════════════════════════════════════════════════════
+
+  build-marco-sdk:
+    name: Build · marco-sdk
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: pnpm/action-setup@v4
+        with: { version: 9, run_install: false }
+      - name: Install dependencies
+        run: pnpm install --prefer-offline --no-frozen-lockfile
+      - name: Cache standalone build · marco-sdk
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/standalone-builds/marco-sdk
+            .cache/tsbuildinfo/marco-sdk.tsbuildinfo
+          key: ${{ runner.os }}-stdbuild-marco-sdk-${{ hashFiles('standalone-scripts/marco-sdk/src/**', 'standalone-scripts/marco-sdk/instruction.ts', 'standalone-scripts/marco-sdk/package.json', 'tsconfig.marco-sdk.json', 'tsconfig.sdk.json', 'tsconfig.xpath.json', 'tsconfig.macro.build.json', 'tsconfig.payment-banner-hider.json', 'vite.config.marco-sdk.ts', 'vite.config.sdk.ts', 'vite.config.xpath.ts', 'vite.config.macro.ts', 'vite.config.payment-banner-hider.ts', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-stdbuild-marco-sdk-
+
+      - name: Build marco-sdk
+        run: pnpm run build:marco-sdk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: marco-sdk-dist
+          path: standalone-scripts/marco-sdk/dist/
+          retention-days: 1
+
+  build-lovable-common:
+    name: Build · lovable-common
+    needs: build-marco-sdk
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: pnpm/action-setup@v4
+        with: { version: 9, run_install: false }
+      - name: Install dependencies
+        run: pnpm install --prefer-offline --no-frozen-lockfile
+      - name: Cache standalone build · lovable-common
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/standalone-builds/lovable-common
+            .cache/tsbuildinfo/lovable-common.tsbuildinfo
+          key: ${{ runner.os }}-stdbuild-lovable-common-${{ hashFiles('standalone-scripts/lovable-common/src/**', 'standalone-scripts/lovable-common/instruction.ts', 'standalone-scripts/lovable-common/package.json', 'tsconfig.lovable-common.json', 'tsconfig.sdk.json', 'tsconfig.xpath.json', 'tsconfig.macro.build.json', 'tsconfig.payment-banner-hider.json', 'vite.config.lovable-common.ts', 'vite.config.sdk.ts', 'vite.config.xpath.ts', 'vite.config.macro.ts', 'vite.config.payment-banner-hider.ts', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-stdbuild-lovable-common-
+
+      - name: Build lovable-common
+        run: pnpm run build:lovable-common
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lovable-common-dist
+          path: standalone-scripts/lovable-common/dist/
+          retention-days: 1
+
+  build-lovable-owner-switch:
+    name: Build · lovable-owner-switch
+    needs: build-lovable-common
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: pnpm/action-setup@v4
+        with: { version: 9, run_install: false }
+      - name: Install dependencies
+        run: pnpm install --prefer-offline --no-frozen-lockfile
+      - name: Cache standalone build · lovable-owner-switch
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/standalone-builds/lovable-owner-switch
+            .cache/tsbuildinfo/lovable-owner-switch.tsbuildinfo
+          key: ${{ runner.os }}-stdbuild-lovable-owner-switch-${{ hashFiles('standalone-scripts/lovable-owner-switch/src/**', 'standalone-scripts/lovable-owner-switch/instruction.ts', 'standalone-scripts/lovable-owner-switch/package.json', 'tsconfig.lovable-owner-switch.json', 'tsconfig.sdk.json', 'tsconfig.xpath.json', 'tsconfig.macro.build.json', 'tsconfig.payment-banner-hider.json', 'vite.config.lovable-owner-switch.ts', 'vite.config.sdk.ts', 'vite.config.xpath.ts', 'vite.config.macro.ts', 'vite.config.payment-banner-hider.ts', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-stdbuild-lovable-owner-switch-
+
+      - name: Build lovable-owner-switch
+        run: pnpm run build:lovable-owner-switch
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lovable-owner-switch-dist
+          path: standalone-scripts/lovable-owner-switch/dist/
+          retention-days: 1
+
+  build-lovable-user-add:
+    name: Build · lovable-user-add
+    needs: build-lovable-common
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: pnpm/action-setup@v4
+        with: { version: 9, run_install: false }
+      - name: Install dependencies
+        run: pnpm install --prefer-offline --no-frozen-lockfile
+      - name: Cache standalone build · lovable-user-add
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/standalone-builds/lovable-user-add
+            .cache/tsbuildinfo/lovable-user-add.tsbuildinfo
+          key: ${{ runner.os }}-stdbuild-lovable-user-add-${{ hashFiles('standalone-scripts/lovable-user-add/src/**', 'standalone-scripts/lovable-user-add/instruction.ts', 'standalone-scripts/lovable-user-add/package.json', 'tsconfig.lovable-user-add.json', 'tsconfig.sdk.json', 'tsconfig.xpath.json', 'tsconfig.macro.build.json', 'tsconfig.payment-banner-hider.json', 'vite.config.lovable-user-add.ts', 'vite.config.sdk.ts', 'vite.config.xpath.ts', 'vite.config.macro.ts', 'vite.config.payment-banner-hider.ts', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-stdbuild-lovable-user-add-
+
+      - name: Build lovable-user-add
+        run: pnpm run build:lovable-user-add
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lovable-user-add-dist
+          path: standalone-scripts/lovable-user-add/dist/
+          retention-days: 1

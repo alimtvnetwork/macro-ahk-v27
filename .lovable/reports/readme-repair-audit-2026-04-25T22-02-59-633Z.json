@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "kind": "readme-repair-audit",
+  "timestamp": "2026-04-25T22:02:59.637Z",
+  "file": "/dev-server/readme.md",
+  "mode": "dry-run",
+  "applied": false,
+  "changedBytes": 0,
+  "summary": {
+    "total": 3,
+    "applied": 0,
+    "wouldApply": 0,
+    "skipped": 0,
+    "notNeeded": 3
+  },
+  "mutations": [],
+  "allRepairs": [
+    {
+      "id": "centered-hero",
+      "label": "Insert <div align=\"center\"> wrapper around hero block",
+      "status": "not-needed",
+      "reason": "hero already wrapped with balanced <div align=\"center\"> … </div>",
+      "preview": null
+    },
+    {
+      "id": "license-section",
+      "label": "Append `## License` section if missing",
+      "status": "not-needed",
+      "reason": "## License heading already present",
+      "preview": null
+    },
+    {
+      "id": "author-misorder",
+      "label": "Reorder Author/Company H3 sub-sections (Author first)",
+      "status": "not-needed",
+      "reason": "Author H3 already appears before Company H3",
+      "preview": null
+    }
+  ]
+}

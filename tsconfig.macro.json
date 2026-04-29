@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noPropertyAccessFromIndexSignature": false,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "allowJs": true,
+    "baseUrl": ".",
+    "paths": {
+      "@macro/*": ["standalone-scripts/macro-controller/src/*"]
+    }
+  },
+  "include": ["standalone-scripts/macro-controller/src/**/*.ts", "standalone-scripts/types/**/*.d.ts"],
+  "exclude": [
+    "node_modules",
+    "standalone-scripts/macro-controller/dist",
+    "standalone-scripts/macro-controller/src/__tests__"
+  ]
+}

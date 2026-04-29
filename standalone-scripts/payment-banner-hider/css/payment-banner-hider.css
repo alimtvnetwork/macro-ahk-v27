@@ -1,0 +1,46 @@
+/*
+ * Payment Banner Hider — Styles
+ *
+ * Scoped via the [data-marco-banner-hider] attribute set by the
+ * PaymentBannerHider class. No !important — specificity comes from
+ * the attribute selector + descendant combinator, which beats the
+ * page's class-based banner styles.
+ *
+ * State machine (matches BannerState in src/types.ts):
+ *   "fading"  → black background, white text, transition primed
+ *   "hiding"  → opacity + max-height collapse to zero
+ *   "done"    → display:none, layout space released
+ */
+
+[data-marco-banner-hider="fading"] {
+    background-color: #000;
+    background-image: none;
+    color: #fff;
+    transition:
+        background-color 250ms ease-in,
+        color 250ms ease-in,
+        opacity 900ms ease-out,
+        max-height 900ms ease-out,
+        margin 900ms ease-out,
+        padding 900ms ease-out;
+}
+
+[data-marco-banner-hider="fading"] * {
+    background-color: transparent;
+    color: #fff;
+}
+
+[data-marco-banner-hider="hiding"] {
+    opacity: 0;
+    max-height: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+[data-marco-banner-hider="done"] {
+    display: none;
+}

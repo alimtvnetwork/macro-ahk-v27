@@ -1,0 +1,83 @@
+%% Key tables view — focused subset of the most-traversed relationships
+%% used by recorder authoring + replay + diagnostics. Use this when the
+%% full ERD (05) is too dense; full attribute lists live in 01/02/03.
+erDiagram
+    Project    ||--o{ StepGroup        : "owns"
+    StepGroup  ||--o{ StepGroup        : "nests"
+    StepGroup  ||--o{ Step             : "contains (ordered)"
+    StepKind   ||--o{ Step             : "classifies"
+    Step       ||--o{ Selector         : "1..N selectors"
+    Selector   ||--o| Selector         : "anchor"
+    Step       ||--o| FieldBinding     : "0..1 binding"
+    DataSource ||--o{ FieldBinding     : "supplies column"
+    Step       ||--o{ StepTag          : "free-form tags"
+    Step       ||--o{ ReplayStepResult : "execution history"
+    ReplayRun  ||--o{ ReplayStepResult : "groups results"
+
+    Project {
+        INTEGER ProjectId PK
+        TEXT    ProjectExternalId
+        TEXT    Name
+    }
+    StepGroup {
+        INTEGER StepGroupId PK
+        INTEGER ProjectId FK
+        INTEGER ParentStepGroupId FK "self-ref, max depth 8"
+        TEXT    Name
+        INTEGER OrderIndex
+    }
+    Step {
+        INTEGER StepId PK
+        INTEGER StepGroupId FK
+        INTEGER StepKindId FK
+        INTEGER OrderIndex
+        TEXT    Label
+        INTEGER RetryCount
+        INTEGER TimeoutMs
+        TEXT    OnSuccessProjectId "cross-project chain"
+        TEXT    OnFailureProjectId "cross-project chain"
+    }
+    StepKind {
+        INTEGER StepKindId PK
+        TEXT    Name
+    }
+    Selector {
+        INTEGER SelectorId PK
+        INTEGER StepId FK
+        INTEGER SelectorKindId FK
+        INTEGER AnchorSelectorId FK
+        TEXT    Expression
+        INTEGER IsPrimary
+    }
+    FieldBinding {
+        INTEGER FieldBindingId PK
+        INTEGER StepId FK
+        INTEGER DataSourceId FK
+        TEXT    ColumnName
+    }
+    DataSource {
+        INTEGER DataSourceId PK
+        INTEGER DataSourceKindId FK
+        TEXT    FilePath
+        INTEGER RowCount
+    }
+    StepTag {
+        INTEGER StepTagId PK
+        INTEGER StepId FK
+        TEXT    Name
+    }
+    ReplayRun {
+        INTEGER ReplayRunId PK
+        TEXT    StartedAt
+        INTEGER TotalSteps
+        INTEGER OkSteps
+        INTEGER FailedSteps
+    }
+    ReplayStepResult {
+        INTEGER ReplayStepResultId PK
+        INTEGER ReplayRunId FK
+        INTEGER StepId FK
+        INTEGER IsOk
+        TEXT    ErrorMessage
+        INTEGER DurationMs
+    }

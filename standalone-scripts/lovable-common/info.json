@@ -1,0 +1,15 @@
+{
+  "id": "default-lovable-common",
+  "title": "Lovable Common (XPath + API)",
+  "slug": "lovable-common",
+  "version": "1.0.0",
+  "author": "Riseup Asia LLC",
+  "categories": [
+    "shared",
+    "lovable"
+  ],
+  "isDefault": false,
+  "order": 50,
+  "createdAt": "2026-04-24T00:00:00Z",
+  "updatedAt": "2026-04-24T00:00:00Z"
+}

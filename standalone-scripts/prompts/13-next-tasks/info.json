@@ -1,0 +1,14 @@
+{
+  "Id": "default-next-tasks",
+  "Title": "Next Tasks",
+  "Slug": "next-tasks",
+  "Version": "1.0.0",
+  "Author": "marco",
+  "Categories": [
+    "automation"
+  ],
+  "IsDefault": true,
+  "Order": 13,
+  "CreatedAt": "2026-03-21T00:00:00Z",
+  "UpdatedAt": "2026-03-21T00:00:00Z"
+}

@@ -1,0 +1,12 @@
+{
+  "Id": "default-test",
+  "Title": "Unit Test Failing",
+  "Slug": "unit-test-failing",
+  "Version": "1.0.0",
+  "Author": "marco",
+  "Categories": [],
+  "IsDefault": true,
+  "Order": 5,
+  "CreatedAt": "2026-01-01T00:00:00Z",
+  "UpdatedAt": "2026-01-01T00:00:00Z"
+}

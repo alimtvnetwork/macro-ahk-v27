@@ -1,0 +1,53 @@
+%%{init: {'theme': 'dark'}}%%
+%% Marco Extension — Bundle Import / Export Flow
+%% Source of truth: src/lib/sqlite-bundle.ts
+%% Lazy-loads JSZip (~95 kB) only when the user triggers an import or export.
+
+flowchart LR
+    subgraph EXPORT ["Export — exportAllAsSqliteZip() / exportProjectAsSqliteZip() / exportPromptsAsSqliteZip()"]
+        direction TB
+        E1[/"User clicks Export in popup<br/>(SqliteBundleActions.tsx)"/]
+        E2["sendMessage GET_ALL_PROJECTS / SCRIPTS / CONFIGS / PROMPTS<br/>→ background handlers"]
+        E3["initSqlJs locateFile → sql-wasm.wasm<br/>new SQL.Database()"]
+        E4["db.run CREATE_PROJECTS / SCRIPTS / CONFIGS / PROMPTS / META<br/>(PascalCase, INTEGER AUTOINCREMENT)"]
+        E5["insertProjects / Scripts / Configs / Prompts<br/>insertMeta exported_at + format_version=4"]
+        E6["db.export() → Uint8Array<br/>db.close()"]
+        E7["loadJSZip() — dynamic import('jszip')<br/>zip.file('marco-backup.db', dbData)"]
+        E8["zip.generateAsync DEFLATE → Blob"]
+        E9[/"triggerDownload(blob, 'marco-backup.zip')"/]
+        E1 --> E2 --> E3 --> E4 --> E5 --> E6 --> E7 --> E8 --> E9
+    end
+
+    subgraph IMPORT ["Import — importFromSqliteZip() / mergeFromSqliteZip()"]
+        direction TB
+        I1[/"User picks .zip in popup"/]
+        I2["file.arrayBuffer()"]
+        I3["loadJSZip() → zip.loadAsync<br/>zip.file('marco-backup.db').async('uint8array')"]
+        I4{"DB file present?"}
+        I5["openDb(uint8array) → sql.js Database"]
+        I6["readProjects / Scripts / Configs<br/>col(obj, Pascal, snake)<br/>resolveUid(obj) — Uid → Id fallback"]
+        I7["db.close()"]
+        I8{"Mode?"}
+        I9["replaceAll: DELETE all → SAVE imported"]
+        I10["mergeAll: SAVE upserts only<br/>(no deletions)"]
+        I11[/"ImportResult { projectCount, scriptCount, configCount }"/]
+        ERR[/"throw 'Invalid bundle: missing marco-backup.db'"/]
+
+        I1 --> I2 --> I3 --> I4
+        I4 -- no  --> ERR
+        I4 -- yes --> I5 --> I6 --> I7 --> I8
+        I8 -- replace --> I9 --> I11
+        I8 -- merge   --> I10 --> I11
+    end
+
+    subgraph CONTRACT ["PascalCase Contract"]
+        direction TB
+        C1["Tables: Projects, Scripts, Configs, Prompts, Meta"]
+        C2["All Id cols: INTEGER PRIMARY KEY AUTOINCREMENT"]
+        C3["Runtime UUID lives in Uid TEXT (v4+)"]
+        C4["Reader tries 'SELECT * FROM Projects'<br/>then falls back to lowercase 'projects' (legacy)"]
+        C5["col() helper: obj[Pascal] ?? obj[snake_case]<br/>tolerates v3 / pre-v4 bundles"]
+    end
+
+    EXPORT -. produces .-> CONTRACT
+    CONTRACT -. consumed by .-> IMPORT

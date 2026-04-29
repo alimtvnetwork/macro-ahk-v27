@@ -1,0 +1,6 @@
+{
+    "$comment": "Mirror of schema-version.ts — keep in lock-step. Loaded by scripts/validate-instruction-schema.mjs (dep-free, no TS).",
+    "pattern": "^\\d+\\.\\d+$",
+    "supported": ["1.0"],
+    "current": "1.0"
+}

@@ -1,0 +1,89 @@
+{
+    "manifest_version": 3,
+    "name": "Marco Macro Extension",
+    "version": "2.230.0",
+    "description": "Riseup Asia Marco — macro automation, XPath recording, and prompt management.",
+    "content_security_policy": {
+        "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+    },
+    "permissions": [
+        "storage",
+        "tabs",
+        "activeTab",
+        "scripting",
+        "cookies",
+        "webNavigation",
+        "alarms",
+        "contextMenus",
+        "unlimitedStorage"
+    ],
+    "host_permissions": [
+        "<all_urls>"
+    ],
+    "background": {
+        "service_worker": "background/index.js",
+        "type": "module"
+    },
+    "action": {
+        "default_popup": "src/popup/popup.html",
+        "default_title": "Marco",
+        "default_icon": {
+            "16": "favicon.png",
+            "48": "favicon.png",
+            "128": "favicon.png"
+        }
+    },
+    "icons": {
+        "16": "favicon.png",
+        "48": "favicon.png",
+        "128": "favicon.png"
+    },
+    "options_page": "src/options/options.html",
+    "content_scripts": [
+        {
+            "matches": ["<all_urls>"],
+            "js": ["content-scripts/message-relay.js"],
+            "run_at": "document_start",
+            "all_frames": false
+        }
+    ],
+    "commands": {
+        "run-scripts": {
+            "suggested_key": {
+                "default": "Ctrl+Shift+Down",
+                "mac": "Command+Shift+Down"
+            },
+            "description": "Run active project scripts in current tab"
+        },
+        "force-run-scripts": {
+            "suggested_key": {
+                "default": "Ctrl+Shift+Up",
+                "mac": "Command+Shift+Up"
+            },
+            "description": "Force re-run active project scripts (bypass idempotency)"
+        },
+        "toggle-recording": {
+            "suggested_key": {
+                "default": "Ctrl+Shift+R",
+                "mac": "Command+Shift+R"
+            },
+            "description": "Start, pause, or resume macro recording in the active tab"
+        }
+    },
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "wasm/sql-wasm.wasm",
+                "wasm/sql-wasm.wasm.checksum.json",
+                "build-meta.json",
+                "prompts/macro-prompts.json",
+                "projects/seed-manifest.json",
+                "projects/scripts/*/*",
+                "content-scripts/xpath-recorder.js",
+                "content-scripts/network-reporter.js",
+                "content-scripts/prompt-injector.js"
+            ],
+            "matches": ["<all_urls>"]
+        }
+    ]
+}

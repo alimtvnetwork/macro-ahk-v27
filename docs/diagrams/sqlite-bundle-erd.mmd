@@ -1,0 +1,80 @@
+%%{init: {'theme': 'dark'}}%%
+%% Marco Extension - Bundle Import/Export SQLite ERD
+%% Source of truth: src/lib/sqlite-bundle.ts
+%% Bundle file: marco-backup.zip contains marco-backup.db (sql.js export, format_version 4)
+%% --
+%% Contract:
+%%   - All tables and columns are PascalCase, no underscores.
+%%   - All Id columns are INTEGER PRIMARY KEY AUTOINCREMENT.
+%%   - Runtime UUIDs travel in a separate Uid TEXT column (v4+).
+%%   - Legacy v3 bundles stored the runtime UUID in a TEXT Id column.
+%%   - resolveUid() falls back transparently on import.
+%%   - Meta rows: exported_at (ISO-8601) and format_version 4.
+
+
+erDiagram
+    Projects {
+        INTEGER Id PK
+        TEXT    Uid
+        INTEGER SchemaVersion
+        TEXT    Name
+        TEXT    Version
+        TEXT    Description
+        TEXT    TargetUrls
+        TEXT    Scripts
+        TEXT    Configs
+        TEXT    CookieRules
+        TEXT    Settings
+        TEXT    CreatedAt
+        TEXT    UpdatedAt
+    }
+
+    Scripts {
+        INTEGER Id PK
+        TEXT    Uid
+        TEXT    Name
+        TEXT    Description
+        TEXT    Code
+        INTEGER RunOrder
+        TEXT    RunAt
+        TEXT    ConfigBinding
+        INTEGER IsIife
+        INTEGER HasDomUsage
+        TEXT    CreatedAt
+        TEXT    UpdatedAt
+    }
+
+    Configs {
+        INTEGER Id PK
+        TEXT    Uid
+        TEXT    Name
+        TEXT    Description
+        TEXT    Json
+        TEXT    CreatedAt
+        TEXT    UpdatedAt
+    }
+
+    Prompts {
+        INTEGER Id PK
+        TEXT    Uid
+        TEXT    Name
+        TEXT    Text
+        INTEGER RunOrder
+        INTEGER IsDefault
+        INTEGER IsFavorite
+        TEXT    Category
+        TEXT    CreatedAt
+        TEXT    UpdatedAt
+    }
+
+    Meta {
+        INTEGER Id PK
+        TEXT    Key UK
+        TEXT    Value
+    }
+
+    %% Bundle tables are intentionally flat — no FOREIGN KEYs.
+    %% Cross-table linkage lives inside Projects.Scripts / Projects.Configs
+    %% as JSON path arrays resolved by Uid (preferred) or Name on import.
+    Projects }o--o{ Scripts : "JSON refs by Uid or Name"
+    Projects }o--o{ Configs : "JSON refs by Uid or Name"

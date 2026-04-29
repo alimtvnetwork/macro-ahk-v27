@@ -1,0 +1,60 @@
+%% Lovable Role-Promotion Flows
+%% Covers both standalone scripts that promote a user to Owner:
+%%   1. lovable-owner-switch  — Admin -> Owner (single PUT)
+%%   2. lovable-user-add      — Add user, then optional Member -> Owner
+%% Editors are normalized to Member at CSV-parse time because Editors
+%% cannot be promoted directly to Owner (R12 invariant).
+%%
+%% Shared promotion API call site:
+%%   standalone-scripts/lovable-common/src/api/lovable-api-client.ts
+%%   LovableApiClient.promoteToOwner(workspaceId, userId)
+%%   -> PUT /memberships/{workspaceId}/{userId}  body: { role: "Owner" }
+
+flowchart TD
+  Start([CSV row]) --> Branch{Which script?}
+
+  %% ──────────────────────────────────────────────────────────
+  %% Path A — lovable-owner-switch (Admin -> Owner)
+  %% ──────────────────────────────────────────────────────────
+  Branch -->|owner-switch| A1[Login as LoginEmail<br/>via XPath form]
+  A1 --> A2[GET /workspaces<br/>resolve WorkspaceId]
+  A2 --> A3[GET /memberships/{WorkspaceId}<br/>resolve target UserId]
+  A3 --> A4{User is Admin?}
+  A4 -->|No| A_skip[Skip row<br/>log reason] --> A_done
+  A4 -->|Yes| A5[promoteToOwner<br/>PUT /memberships/{WorkspaceId}/{UserId}<br/>body: role=Owner]
+  A5 --> A6{HTTP 2xx?}
+  A6 -->|No| A_fail[Mark row Failed<br/>persist error in SQLite] --> A_signout
+  A6 -->|Yes| A7[Mark row Promoted<br/>persist in SQLite]
+  A7 --> A_signout[Best-effort sign-out]
+  A_signout --> A_done([Next row])
+
+  %% ──────────────────────────────────────────────────────────
+  %% Path B — lovable-user-add (Add, then conditional promotion)
+  %% ──────────────────────────────────────────────────────────
+  Branch -->|user-add| B0[Normalize CSV role<br/>Editor -> Member<br/>Owner kept as Owner]
+  B0 --> B1[Login as LoginEmail<br/>via XPath form]
+  B1 --> B2[Resolve WorkspaceId<br/>GET /workspaces]
+  B2 --> B3[Step A: POST /memberships<br/>body: email + role*<br/>* Owner is added as Member first]
+  B3 --> B4{Add succeeded?}
+  B4 -->|No| B_fail[Mark row Failed<br/>persist error] --> B_signout
+  B4 -->|Yes| B5[Capture returned UserId<br/>persist in SQLite]
+  B5 --> B6{Target role == Owner?}
+  B6 -->|No<br/>Member only| B_done_member[Mark row Added<br/>role=Member]
+  B6 -->|Yes| B7[Step B: promoteToOwner<br/>PUT /memberships/{WorkspaceId}/{UserId}<br/>body: role=Owner]
+  B7 --> B8{HTTP 2xx?}
+  B8 -->|No| B_partfail[Mark row Partial<br/>added but not promoted]
+  B8 -->|Yes| B_done_owner[Mark row Promoted<br/>role=Owner]
+  B_done_member --> B_signout[Best-effort sign-out]
+  B_partfail --> B_signout
+  B_done_owner --> B_signout
+  B_signout --> B_done([Next row])
+
+  %% ──────────────────────────────────────────────────────────
+  %% Shared promotion API (R12 invariant: single call site)
+  %% ──────────────────────────────────────────────────────────
+  subgraph Shared[Shared promotion API - single call site]
+    direction TB
+    API[LovableApiClient.promoteToOwner<br/>PUT /memberships/{wsId}/{userId}<br/>body: role=Owner]
+  end
+  A5 -.uses.-> API
+  B7 -.uses.-> API

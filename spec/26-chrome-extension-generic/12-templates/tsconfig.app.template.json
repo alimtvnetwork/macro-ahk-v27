@@ -1,0 +1,76 @@
+{
+  "//_template_header": {
+    "purpose": "TypeScript config for the extension UI bundle (background SW, options page, popup, content scripts)",
+    "last_reviewed": "2026-04-24",
+    "tokens": ["none — config is project-agnostic"]
+  },
+
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
+
+    "jsx": "react-jsx",
+    "useDefineForClassFields": true,
+
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": false,
+
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": false,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+
+    "types": ["chrome", "vite/client"],
+
+    "noEmit": true,
+
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@background/*": ["./src/background/*"],
+      "@content/*": ["./src/content/*"],
+      "@options/*": ["./src/options/*"],
+      "@popup/*": ["./src/popup/*"],
+      "@shared/*": ["./src/shared/*"],
+      "@platform/*": ["./src/platform/*"]
+    }
+  },
+
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.d.ts"
+  ],
+
+  "exclude": [
+    "node_modules",
+    "dist",
+    "release",
+    "standalone-scripts",
+    "scripts",
+    "tests",
+    "**/*.test.ts",
+    "**/*.test.tsx"
+  ],
+
+  "references": [
+    { "path": "./tsconfig.sdk.template.json" },
+    { "path": "./tsconfig.node.template.json" }
+  ]
+}

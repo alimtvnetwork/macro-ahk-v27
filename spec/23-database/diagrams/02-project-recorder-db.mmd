@@ -1,0 +1,118 @@
+erDiagram
+    DataSourceKind ||--o{ DataSource    : "classifies"
+    SelectorKind   ||--o{ Selector      : "classifies"
+    StepKind       ||--o{ Step          : "classifies"
+    StepStatus     ||--o{ Step          : "classifies"
+
+    Step       ||--o{ Selector     : "uses"
+    Step       ||--o| FieldBinding : "may bind"
+    Step       ||--o{ StepTag      : "tagged"
+    DataSource ||--o{ FieldBinding : "supplies"
+    Selector   ||--o| Selector     : "anchored by"
+
+    ReplayRun  ||--o{ ReplayStepResult : "contains"
+    Step       ||--o{ ReplayStepResult : "scored"
+
+    DataSourceKind {
+        INTEGER DataSourceKindId PK
+        TEXT    Name
+    }
+
+    SelectorKind {
+        INTEGER SelectorKindId PK
+        TEXT    Name
+    }
+
+    StepKind {
+        INTEGER StepKindId PK
+        TEXT    Name
+    }
+
+    StepStatus {
+        INTEGER StepStatusId PK
+        TEXT    Name
+    }
+
+    DataSource {
+        INTEGER DataSourceId PK
+        INTEGER DataSourceKindId FK
+        TEXT    FilePath
+        TEXT    Columns
+        INTEGER RowCount
+        TEXT    CreatedAt
+    }
+
+    Step {
+        INTEGER StepId PK
+        INTEGER StepKindId FK
+        INTEGER StepStatusId FK
+        INTEGER OrderIndex
+        TEXT    VariableName
+        TEXT    Label
+        TEXT    Description
+        TEXT    InlineJs
+        TEXT    ParamsJson
+        INTEGER IsBreakpoint
+        INTEGER IsDisabled
+        INTEGER RetryCount
+        INTEGER TimeoutMs
+        TEXT    OnSuccessProjectId
+        TEXT    OnFailureProjectId
+        TEXT    CapturedAt
+        TEXT    UpdatedAt
+    }
+
+    StepTag {
+        INTEGER StepTagId PK
+        INTEGER StepId FK
+        TEXT    Name
+    }
+
+    Selector {
+        INTEGER SelectorId PK
+        INTEGER StepId FK
+        INTEGER SelectorKindId FK
+        TEXT    Expression
+        INTEGER AnchorSelectorId FK
+        INTEGER IsPrimary
+    }
+
+    FieldBinding {
+        INTEGER FieldBindingId PK
+        INTEGER StepId FK
+        INTEGER DataSourceId FK
+        TEXT    ColumnName
+        TEXT    CreatedAt
+    }
+
+    JsSnippet {
+        INTEGER JsSnippetId PK
+        TEXT    Name
+        TEXT    Description
+        TEXT    Body
+        TEXT    CreatedAt
+        TEXT    UpdatedAt
+    }
+
+    ReplayRun {
+        INTEGER ReplayRunId PK
+        TEXT    StartedAt
+        TEXT    FinishedAt
+        INTEGER TotalSteps
+        INTEGER OkSteps
+        INTEGER FailedSteps
+        TEXT    Notes
+    }
+
+    ReplayStepResult {
+        INTEGER ReplayStepResultId PK
+        INTEGER ReplayRunId FK
+        INTEGER StepId FK
+        INTEGER OrderIndex
+        INTEGER IsOk
+        TEXT    ErrorMessage
+        TEXT    ResolvedXPath
+        TEXT    StartedAt
+        TEXT    FinishedAt
+        INTEGER DurationMs
+    }

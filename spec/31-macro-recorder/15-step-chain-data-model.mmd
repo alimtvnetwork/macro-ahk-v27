@@ -1,0 +1,39 @@
+erDiagram
+    Step ||--o{ StepTag : "has"
+    Step ||--o{ Selector : "uses"
+    Step ||--o{ FieldBinding : "binds"
+    Step }o--|| StepKind : "kind"
+    Step }o--|| StepStatus : "status"
+    Step }o..o| ExtensionProject : "OnSuccessProjectId"
+    Step }o..o| ExtensionProject : "OnFailureProjectId"
+
+    Step {
+        INTEGER StepId PK
+        INTEGER StepKindId FK
+        INTEGER StepStatusId FK
+        INTEGER OrderIndex
+        TEXT    VariableName
+        TEXT    Label
+        TEXT    Description
+        INTEGER IsDisabled
+        INTEGER RetryCount
+        INTEGER TimeoutMs
+        TEXT    OnSuccessProjectId
+        TEXT    OnFailureProjectId
+        TEXT    InlineJs
+        INTEGER IsBreakpoint
+        TEXT    CapturedAt
+        TEXT    UpdatedAt
+    }
+
+    StepTag {
+        INTEGER StepTagId PK
+        INTEGER StepId FK
+        TEXT    Name
+    }
+
+    ExtensionProject {
+        TEXT Slug PK
+        TEXT Name
+        TEXT Tags
+    }

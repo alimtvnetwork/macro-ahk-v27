@@ -1,0 +1,310 @@
+%%{init: {'theme': 'dark'}}%%
+%% Marco Extension — Runtime SQLite ERD (logs.db / errors.db)
+%% Source of truth: src/background/db-schemas.ts
+%% Contract: PascalCase table + column names; INTEGER PRIMARY KEY AUTOINCREMENT for all `Id` columns.
+%% See: spec/02-coding-guidelines/coding-guidelines/database-naming.md
+%%      spec/02-coding-guidelines/coding-guidelines/database-id-convention.md
+
+erDiagram
+    %% =========================================================
+    %%  Sessions / Logs / Errors  (logs.db + errors.db)
+    %% =========================================================
+    Sessions {
+        INTEGER Id PK
+        TEXT    StartedAt
+        TEXT    EndedAt
+        TEXT    Version
+        TEXT    UserAgent
+        TEXT    Notes
+    }
+
+    Logs {
+        INTEGER Id PK
+        INTEGER SessionId FK
+        TEXT    Timestamp
+        TEXT    Level
+        TEXT    Source
+        TEXT    Category
+        TEXT    Action
+        TEXT    LogType
+        INTEGER Indent
+        TEXT    Detail
+        TEXT    Metadata
+        INTEGER DurationMs
+        TEXT    ProjectId
+        TEXT    UrlRuleId
+        TEXT    ScriptId
+        TEXT    ConfigId
+        TEXT    ExtVersion
+    }
+
+    Errors {
+        INTEGER Id PK
+        INTEGER SessionId FK
+        INTEGER LogId FK
+        TEXT    Timestamp
+        TEXT    Level
+        TEXT    Source
+        TEXT    Category
+        TEXT    ErrorCode FK
+        INTEGER Step
+        TEXT    Xpath
+        TEXT    Message
+        TEXT    StackTrace
+        TEXT    Context
+        INTEGER Resolved
+        TEXT    Resolution
+        TEXT    ProjectId
+        TEXT    UrlRuleId
+        TEXT    ScriptId
+        TEXT    ConfigId
+        TEXT    ScriptFile
+        INTEGER ErrorLine
+        INTEGER ErrorColumn
+        TEXT    ExtVersion
+    }
+
+    ErrorCodes {
+        TEXT Code PK
+        TEXT Severity
+        TEXT Description
+        TEXT Resolution
+    }
+
+    %% =========================================================
+    %%  Prompts subsystem
+    %% =========================================================
+    Prompts {
+        INTEGER Id PK
+        TEXT    Slug UK
+        TEXT    Name
+        TEXT    Text
+        TEXT    Version
+        INTEGER SortOrder
+        INTEGER IsDefault
+        INTEGER IsFavorite
+        TEXT    CreatedAt
+        TEXT    UpdatedAt
+    }
+
+    PromptsCategory {
+        INTEGER Id PK
+        TEXT    Name UK
+        INTEGER SortOrder
+        TEXT    CreatedAt
+    }
+
+    PromptsToCategory {
+        INTEGER Id PK
+        INTEGER PromptId FK
+        INTEGER CategoryId FK
+    }
+
+    %% =========================================================
+    %%  Project state
+    %% =========================================================
+    ProjectKv {
+        TEXT ProjectId PK
+        TEXT Key PK
+        TEXT Value
+        TEXT UpdatedAt
+    }
+
+    ProjectFiles {
+        INTEGER Id PK
+        TEXT    ProjectId
+        TEXT    Filename
+        TEXT    MimeType
+        BLOB    Data
+        INTEGER Size
+        TEXT    CreatedAt
+    }
+
+    Settings {
+        TEXT Key PK
+        TEXT Value
+        TEXT UpdatedAt
+    }
+
+    GroupedKv {
+        INTEGER Id PK
+        TEXT    GroupName
+        TEXT    Key
+        TEXT    Value
+        TEXT    UpdatedAt
+    }
+
+    Scripts {
+        INTEGER Id PK
+        TEXT    Name
+        TEXT    Code
+        TEXT    FilePath
+        INTEGER IsAbsolute
+        INTEGER IsEnabled
+        TEXT    ProjectId
+        INTEGER SortOrder
+        TEXT    CreatedAt
+        TEXT    UpdatedAt
+    }
+
+    %% =========================================================
+    %%  Updater subsystem
+    %% =========================================================
+    UpdaterInfo {
+        INTEGER Id PK
+        TEXT    Name
+        TEXT    Description
+        TEXT    ScriptUrl
+        TEXT    VersionInfoUrl
+        TEXT    InstructionUrl
+        TEXT    ChangelogUrl
+        INTEGER IsGit
+        INTEGER IsRedirectable
+        INTEGER MaxRedirectDepth
+        INTEGER IsInstructionRedirect
+        INTEGER InstructionRedirectDepth
+        INTEGER HasInstructions
+        INTEGER HasChangelogFromVersionInfo
+        INTEGER HasUserConfirmBeforeUpdate
+        INTEGER IsEnabled
+        INTEGER AutoCheckIntervalMinutes
+        INTEGER CacheExpiryMinutes
+        TEXT    CachedRedirectUrl
+        TEXT    CachedRedirectAt
+        TEXT    CurrentVersion
+        TEXT    LatestVersion
+        TEXT    LastCheckedAt
+        TEXT    LastUpdatedAt
+        TEXT    CreatedAt
+        TEXT    UpdatedAt
+    }
+
+    UpdateSettings {
+        INTEGER Id PK
+        INTEGER AutoCheckIntervalMinutes
+        INTEGER HasUserConfirmBeforeUpdate
+        INTEGER HasChangelogFromVersionInfo
+        INTEGER CacheExpiryMinutes
+        TEXT    CreatedAt
+        TEXT    UpdatedAt
+    }
+
+    UpdaterCategory {
+        INTEGER Id PK
+        TEXT    Name UK
+        INTEGER SortOrder
+        TEXT    CreatedAt
+    }
+
+    UpdaterToCategory {
+        INTEGER Id PK
+        INTEGER UpdaterId FK
+        INTEGER CategoryId FK
+    }
+
+    UpdaterEndpoints {
+        INTEGER Id PK
+        INTEGER UpdaterId FK
+        TEXT    Url
+        INTEGER SortOrder
+        INTEGER ExpectedStatusCode
+        INTEGER IsRedirectable
+        INTEGER MaxRedirectDepth
+    }
+
+    UpdaterSteps {
+        INTEGER Id PK
+        INTEGER UpdaterId FK
+        TEXT    StepId
+        INTEGER SortOrder
+        TEXT    Type
+        TEXT    Condition
+        TEXT    ResourceType
+        TEXT    SourceUrl
+        INTEGER ExpectedStatus
+        INTEGER IsRedirectable
+        INTEGER MaxRedirectDepth
+        TEXT    Destination
+        TEXT    PostProcess
+        TEXT    ExecutionCommand
+        TEXT    ValidationRule
+    }
+
+    DynamicLoadLog {
+        INTEGER Id PK
+        TEXT    Timestamp
+        TEXT    Requester
+        TEXT    Target
+        TEXT    Status
+        TEXT    Detail
+        TEXT    ExtVersion
+    }
+
+    %% =========================================================
+    %%  Cross-Project Sync (SharedAsset / AssetLink / Groups)
+    %%  See: spec/21-app/02-features/misc-features/cross-project-sync.md
+    %% =========================================================
+    SharedAsset {
+        INTEGER Id PK
+        TEXT    Type
+        TEXT    Name
+        TEXT    Slug UK
+        TEXT    ContentJson
+        TEXT    ContentHash
+        TEXT    Version
+        TEXT    CreatedAt
+        TEXT    UpdatedAt
+    }
+
+    AssetLink {
+        INTEGER Id PK
+        INTEGER SharedAssetId FK
+        INTEGER ProjectId
+        TEXT    LinkState
+        TEXT    PinnedVersion
+        TEXT    LocalOverrideJson
+        TEXT    SyncedAt
+    }
+
+    AssetVersion {
+        INTEGER Id PK
+        INTEGER SharedAssetId FK
+        TEXT    Version
+        TEXT    ContentJson
+        TEXT    ContentHash
+        TEXT    ChangedBy
+        TEXT    CreatedAt
+    }
+
+    ProjectGroup {
+        INTEGER Id PK
+        TEXT    Name
+        TEXT    SharedSettingsJson
+        TEXT    CreatedAt
+    }
+
+    ProjectGroupMember {
+        INTEGER Id PK
+        INTEGER GroupId FK
+        INTEGER ProjectId
+    }
+
+    %% =========================================================
+    %%  Relationships (declared FOREIGN KEYs only)
+    %% =========================================================
+    Sessions          ||--o{ Logs                : "SessionId"
+    Sessions          ||--o{ Errors              : "SessionId"
+    Logs              ||--o{ Errors              : "LogId (nullable)"
+    ErrorCodes        ||--o{ Errors              : "ErrorCode"
+
+    Prompts           ||--o{ PromptsToCategory   : "PromptId  (CASCADE)"
+    PromptsCategory   ||--o{ PromptsToCategory   : "CategoryId (CASCADE)"
+
+    UpdaterInfo       ||--o{ UpdaterToCategory   : "UpdaterId (CASCADE)"
+    UpdaterCategory   ||--o{ UpdaterToCategory   : "CategoryId (CASCADE)"
+    UpdaterInfo       ||--o{ UpdaterEndpoints    : "UpdaterId (CASCADE)"
+    UpdaterInfo       ||--o{ UpdaterSteps        : "UpdaterId (CASCADE)"
+
+    SharedAsset       ||--o{ AssetLink           : "SharedAssetId (CASCADE)"
+    SharedAsset       ||--o{ AssetVersion        : "SharedAssetId (CASCADE)"
+    ProjectGroup      ||--o{ ProjectGroupMember  : "GroupId (CASCADE)"

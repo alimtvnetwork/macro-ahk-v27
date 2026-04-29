@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "standalone-scripts/marco-sdk/dist",
+    "declaration": false,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@sdk/*": [
+        "standalone-scripts/marco-sdk/src/*"
+      ]
+    },
+    "incremental": true,
+    "tsBuildInfoFile": ".cache/tsbuildinfo/marco-sdk.tsbuildinfo"
+  },
+  "include": [
+    "standalone-scripts/marco-sdk/src/**/*.ts",
+    "standalone-scripts/types/**/*.ts",
+    "standalone-scripts/types/**/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

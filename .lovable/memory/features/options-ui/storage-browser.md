@@ -1,0 +1,4 @@
+# Memory: features/options-ui/storage-browser
+Updated: 2026-03-30
+
+The 'Storage' section provides a 4-category landing page (Database, Session Storage, Cookies, Local/IndexedDB) with live item counts and estimated sizes via `StorageCategoryCards`. Each category drills into a detail view: Database uses `StorageCard` + paginated `DataTable` with filters; Session and Cookies tables have inline search filtering and JSON export buttons; Local Storage reuses `DataStoreTable`. A cross-category search bar in `DataBrowserPanel` propagates a `searchTerm` prop to filter the active category's entries. The Database view covers 9 PascalCase SQLite tables and 1 view (PromptsDetails). Views are read-only with dashed borders. Modification is restricted for immutable fields (🔒). Default prompts are seeded on first load.

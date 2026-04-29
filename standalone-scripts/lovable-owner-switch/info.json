@@ -1,0 +1,15 @@
+{
+  "id": "default-lovable-owner-switch",
+  "title": "Lovable Owner Switch",
+  "slug": "lovable-owner-switch",
+  "version": "1.0.0",
+  "author": "Riseup Asia LLC",
+  "categories": [
+    "automation",
+    "lovable"
+  ],
+  "isDefault": false,
+  "order": 60,
+  "createdAt": "2026-04-24T00:00:00Z",
+  "updatedAt": "2026-04-24T00:00:00Z"
+}

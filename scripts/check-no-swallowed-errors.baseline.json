@@ -1,0 +1,644 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Allow-list of pre-existing swallowed-error sites. Each entry is matched on file + kind + snippet (line-agnostic). NEVER use this to silence new violations — fix the catch block, then run --update-baseline to drop the entry.",
+  "generatedAt": "2026-04-27T23:45:58.173Z",
+  "entries": [
+    {
+      "file": "src/background/bg-logger.ts",
+      "line": 123,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/bg-logger.ts",
+      "line": 120,
+      "kind": "promise-catch-noop",
+      "snippet": ".catch(() => { })",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/db-persistence.ts",
+      "line": 38,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/handlers/dynamic-require-handler.ts",
+      "line": 207,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/handlers/injection-wrapper.ts",
+      "line": 48,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/handlers/logging-handler.ts",
+      "line": 281,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/handlers/prompt-chain-handler.ts",
+      "line": 155,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/handlers/script-info-handler.ts",
+      "line": 147,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/handlers/sdk-selftest-handler.ts",
+      "line": 182,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/handlers/settings-handler.ts",
+      "line": 118,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/handlers/storage-handler.ts",
+      "line": 68,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/handlers/updater-handler.ts",
+      "line": 344,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/handlers/xpath-validation-handler.ts",
+      "line": 154,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/hot-reload.ts",
+      "line": 119,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/injection-cache.ts",
+      "line": 167,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/namespace-cache.ts",
+      "line": 43,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/namespace-cache.ts",
+      "line": 83,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/recorder/step-library/export-bundle.ts",
+      "line": 435,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/recorder/step-library/import-bundle.ts",
+      "line": 589,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/recorder/url-tab-click.ts",
+      "line": 293,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/recorder/xpath-of-element.ts",
+      "line": 47,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/schema-meta-engine.ts",
+      "line": 288,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/schema-migration.ts",
+      "line": 193,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/script-resolver.ts",
+      "line": 75,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/service-worker-main.ts",
+      "line": 39,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/background/status-handler.ts",
+      "line": 60,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/options/MonacoCodeEditor.tsx",
+      "line": 509,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/options/MonacoCodeEditor.tsx",
+      "line": 521,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/options/ProjectDetailView.tsx",
+      "line": 1106,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/options/ProjectGroupPanel.tsx",
+      "line": 281,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/options/PromptVariablesCard.tsx",
+      "line": 43,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/options/SettingsView.tsx",
+      "line": 136,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/options/StepGroupLibraryPanel.tsx",
+      "line": 1675,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/options/StepGroupLibraryPanel.tsx",
+      "line": 1859,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/options/TokenSeederStatusIndicator.tsx",
+      "line": 118,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/options/UpdaterManagementView.tsx",
+      "line": 170,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/options/WasmStatusBanner.tsx",
+      "line": 488,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/options/WasmStatusBanner.tsx",
+      "line": 606,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/options/json-tree/json-tree-helpers.ts",
+      "line": 70,
+      "kind": "empty-catch",
+      "snippet": "catch (jsonParseError: unknown) {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/options/project-database/JsonSchemaTab.tsx",
+      "line": 229,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/options/project-database/JsonSchemaTab.tsx",
+      "line": 306,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/options/token-seeder-diagnostics-cache.ts",
+      "line": 84,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/options/token-seeder-diagnostics-cache.ts",
+      "line": 94,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/overlay/DraggableOverlay.tsx",
+      "line": 42,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/popup/BootFailureBanner.tsx",
+      "line": 89,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/popup/InjectionModeToggle.tsx",
+      "line": 31,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/popup/PopupHeader.tsx",
+      "line": 24,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/popup/SessionCopyButton.tsx",
+      "line": 154,
+      "kind": "promise-catch-noop",
+      "snippet": ".catch(() => { })",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/recorder/FloatingController.tsx",
+      "line": 82,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/recorder/FloatingController.tsx",
+      "line": 88,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/recorder/KeywordEventBulkContextMenu.tsx",
+      "line": 501,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/recorder/KeywordEventBulkContextMenu.tsx",
+      "line": 512,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/recorder/KeywordEventStepContextMenu.tsx",
+      "line": 111,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/components/webhook/CopyLogButton.tsx",
+      "line": 23,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/hooks/use-auto-run-chain-after-recording.ts",
+      "line": 107,
+      "kind": "promise-catch-noop",
+      "snippet": ".catch(() => { })",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/hooks/use-editor-theme.ts",
+      "line": 21,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/hooks/use-editor-theme.ts",
+      "line": 34,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/hooks/use-error-count.ts",
+      "line": 58,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/hooks/use-error-count.ts",
+      "line": 111,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/hooks/use-keyword-events.ts",
+      "line": 144,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/hooks/use-library-link-map.ts",
+      "line": 61,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/hooks/use-popup-data.ts",
+      "line": 275,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/hooks/use-step-library.ts",
+      "line": 535,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/hooks/use-version-check.ts",
+      "line": 69,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/lib/controller-panel-toggles.ts",
+      "line": 83,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/lib/controller-panel-toggles.ts",
+      "line": 119,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/lib/keyword-event-chain.ts",
+      "line": 94,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/lib/keyword-event-chain.ts",
+      "line": 100,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/lib/sqlite-bundle-contract.ts",
+      "line": 267,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/lib/sqlite-bundle.ts",
+      "line": 646,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/options/sections/ProjectEditor.tsx",
+      "line": 85,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/pages/Options.tsx",
+      "line": 131,
+      "kind": "promise-catch-noop",
+      "snippet": ".catch(() => { })",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "src/platform/chrome-adapter.ts",
+      "line": 136,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "standalone-scripts/macro-controller/src/async-utils.ts",
+      "line": 69,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "standalone-scripts/macro-controller/src/startup-timing.ts",
+      "line": 111,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "standalone-scripts/macro-controller/src/startup.ts",
+      "line": 87,
+      "kind": "empty-catch",
+      "snippet": "catch (_e: unknown) {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "standalone-scripts/macro-controller/src/toast.ts",
+      "line": 75,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "standalone-scripts/macro-controller/src/ui/bulk-rename.ts",
+      "line": 153,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "standalone-scripts/macro-controller/src/ui/bulk-rename.ts",
+      "line": 225,
+      "kind": "empty-catch",
+      "snippet": "catch(function () {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "standalone-scripts/macro-controller/src/ui/error-overlay.ts",
+      "line": 785,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "standalone-scripts/macro-controller/src/ui/settings-ui.ts",
+      "line": 293,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "standalone-scripts/macro-controller/src/ws-move.ts",
+      "line": 379,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "standalone-scripts/marco-sdk/src/config.ts",
+      "line": 47,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "standalone-scripts/marco-sdk/src/http.ts",
+      "line": 219,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "standalone-scripts/marco-sdk/src/index.ts",
+      "line": 96,
+      "kind": "promise-catch-noop",
+      "snippet": ".catch(() => { })",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "standalone-scripts/marco-sdk/src/prompts.ts",
+      "line": 216,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "standalone-scripts/marco-sdk/src/prompts.ts",
+      "line": 248,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "standalone-scripts/marco-sdk/src/prompts.ts",
+      "line": 374,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "standalone-scripts/marco-sdk/src/self-test.ts",
+      "line": 470,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "standalone-scripts/marco-sdk/src/self-test.ts",
+      "line": 173,
+      "kind": "promise-catch-noop",
+      "snippet": ".catch(() => { })",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    },
+    {
+      "file": "standalone-scripts/xpath/src/find-element.ts",
+      "line": 81,
+      "kind": "empty-catch",
+      "snippet": "catch {",
+      "reason": "TODO: explain why this catch silently swallows, or fix it."
+    }
+  ]
+}

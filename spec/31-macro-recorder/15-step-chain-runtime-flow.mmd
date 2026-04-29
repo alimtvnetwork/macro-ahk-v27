@@ -1,0 +1,19 @@
+flowchart TD
+    Start([Start replay of Project A]) --> Load[Load ordered Step rows]
+    Load --> Next{Next step?}
+    Next -- no --> Done([Chain complete])
+    Next -- yes --> Disabled{IsDisabled = 1?}
+    Disabled -- yes --> Next
+    Disabled -- no --> Attempt[Attempt step<br/>bounded by TimeoutMs]
+    Attempt --> Outcome{Success?}
+    Outcome -- yes --> SuccessLink{OnSuccessProjectId set?}
+    SuccessLink -- yes --> Enqueue[Enqueue replayProject<br/>depth cap = 1]
+    SuccessLink -- no --> Next
+    Enqueue --> Next
+    Outcome -- no --> Retry{Retries left?}
+    Retry -- yes --> Attempt
+    Retry -- no --> Report[Emit FailureReport<br/>Phase 03 error-manage]
+    Report --> FailureLink{OnFailureProjectId set?}
+    FailureLink -- yes --> Dispatch[replayProject failure branch]
+    FailureLink -- no --> Halt([Halt chain])
+    Dispatch --> Halt

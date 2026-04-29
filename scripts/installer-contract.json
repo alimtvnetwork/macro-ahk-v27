@@ -1,0 +1,138 @@
+{
+  "$schema": "./installer-contract.schema.json",
+  "schemaVersion": "1.0.0",
+  "description": "Single source of truth for install.sh and install.ps1. Both installers parse this file at startup so flags, exit codes, env-var names, default endpoints and spec-step IDs cannot drift between Bash and PowerShell. Conforms to spec/14-update/01-generic-installer-behavior.md. See scripts/check-installer-contract.mjs for drift detection.",
+
+  "repo": {
+    "default": "alimtvnetwork/macro-ahk-v23",
+    "rationale": "Both installers MUST default to the same canonical repo. Drift between install.sh and install.ps1 here was the bug that motivated this contract."
+  },
+
+  "version": {
+    "regex": "^v[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.-]+)?$",
+    "regexPosix": "^v[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.-]+)?$",
+    "regexDotnet": "^v\\d+\\.\\d+\\.\\d+(-[A-Za-z0-9.-]+)?$",
+    "mainBranchSentinel": "__MAIN_BRANCH__"
+  },
+
+  "endpoints": {
+    "apiBase": {
+      "envVar": "MARCO_API_BASE",
+      "default": "https://api.github.com"
+    },
+    "downloadBase": {
+      "envVar": "MARCO_DOWNLOAD_BASE",
+      "default": "https://github.com"
+    },
+    "mainBranch": {
+      "envVar": "MARCO_MAIN_BRANCH",
+      "default": "main"
+    },
+    "installerUrl": {
+      "envVar": "MARCO_INSTALLER_URL",
+      "purpose": "Override the URL self-detection used to derive the version when the script is piped from a release page."
+    },
+    "installerConfig": {
+      "envVar": "MARCO_INSTALLER_CONFIG",
+      "purpose": "Override the path to install.config.{sh,ps1}."
+    }
+  },
+
+  "exitCodes": {
+    "0": { "name": "ok",                "specSection": "§8.1", "description": "Successful install or successful --dry-run." },
+    "1": { "name": "preflight",         "specSection": "§8.1", "description": "Bash/PowerShell missing, unreadable script, etc." },
+    "3": { "name": "bad_version_arg",   "specSection": "§8.1", "description": "--version / -Version did not match the semver regex or 'latest'." },
+    "4": { "name": "missing_artifact",  "specSection": "§8.1", "description": "Strict mode: the requested release exists but the asset (zip) is not attached." },
+    "5": { "name": "network_or_tooling","specSection": "§8.1", "description": "API unreachable, curl/Invoke-WebRequest failed, or required tooling missing." },
+    "6": { "name": "invalid_archive",   "specSection": "§8.1", "description": "Checksum mismatch, corrupt zip/tar, or unzip failure." }
+  },
+
+  "flags": {
+    "version": {
+      "long": "--version",
+      "short": "-v",
+      "powershell": "-Version",
+      "type": "string",
+      "specSection": "§5",
+      "description": "Force a specific version (vX.Y.Z[-pre]) or 'latest'."
+    },
+    "dir": {
+      "long": "--dir",
+      "short": "-d",
+      "powershell": "-InstallDir",
+      "type": "string",
+      "specSection": "§5",
+      "description": "Target install directory."
+    },
+    "repo": {
+      "long": "--repo",
+      "short": "-r",
+      "powershell": "-Repo",
+      "type": "string",
+      "specSection": "§5",
+      "description": "Override owner/repo."
+    },
+    "dryRun": {
+      "long": "--dry-run",
+      "powershell": "-DryRun",
+      "type": "switch",
+      "specSection": "§5",
+      "description": "Resolve the plan, print it, exit 0 without installing."
+    },
+    "noSiblingDiscovery": {
+      "long": "--no-sibling-discovery",
+      "powershell": "-NoSiblingDiscovery",
+      "type": "switch",
+      "specSection": "§4",
+      "description": "Disable sibling-repo probing (overrides config)."
+    },
+    "enableSiblingDiscovery": {
+      "long": "--enable-sibling-discovery",
+      "powershell": "-EnableSiblingDiscovery",
+      "type": "switch",
+      "specSection": "§4",
+      "description": "Force-enable sibling-repo probing (overrides config; ignored in strict mode per §4 rule 6)."
+    },
+    "help": {
+      "long": "--help",
+      "short": "-h",
+      "powershell": "-Help",
+      "type": "switch",
+      "specSection": "§5",
+      "description": "Print usage and exit 0."
+    }
+  },
+
+  "specSteps": {
+    "AC-1":  "Strict mode (URL-pinned or explicit semver --version) installs that exact version. No fallback.",
+    "AC-2":  "Discovery mode + zero releases → main-branch tarball fallback (exit 0).",
+    "AC-3":  "Sibling-repo discovery is opt-in, runs only in discovery mode, parallel HEAD probes capped by depth, parallelism, and 5s wall-clock.",
+    "AC-4":  "Sibling discovery NEVER runs in strict mode regardless of config.",
+    "AC-5":  "--dry-run prints the resolved plan and exits 0 without installing.",
+    "AC-6":  "Strict-mode missing release asset → exit 4 with version + URL + hint.",
+    "AC-7":  "Bad --version → exit 3 with version regex hint.",
+    "AC-8":  "Network/API failure in discovery mode → exit 5 (never silent fallthrough).",
+    "AC-21": "Checksum verification: download checksums.txt, verify SHA-256 of zip before extraction.",
+    "AC-22": "Checksum mismatch → exit 6 and abort install.",
+    "AC-23": "Missing checksums.txt → soft warn (back-compat with legacy releases without SHA256SUMS)."
+  },
+
+  "siblingDiscovery": {
+    "specSection": "§4",
+    "envVars": {
+      "enabled":            { "name": "SIBLING_DISCOVERY_ENABLED", "default": "0" },
+      "namePattern":        { "name": "SIBLING_NAME_PATTERN",      "default": "macro-ahk-v{N}" },
+      "probeDepth":         { "name": "SIBLING_PROBE_DEPTH",       "default": 20 },
+      "parallelism":        { "name": "SIBLING_PARALLELISM",       "default": 8 },
+      "probeTimeoutSecs":   { "name": "SIBLING_PROBE_TIMEOUT_SECS","default": 5 }
+    }
+  },
+
+  "checksums": {
+    "specSection": "§7.1",
+    "fileName": "checksums.txt",
+    "algorithm": "SHA-256",
+    "format": "<hex>  <filename>",
+    "missingPolicy": "soft-warn-back-compat"
+  }
+}

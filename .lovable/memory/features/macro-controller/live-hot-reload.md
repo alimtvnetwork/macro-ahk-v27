@@ -1,0 +1,4 @@
+# Memory: features/macro-controller/script-re-inject
+Updated: 2026-03-26
+
+Issue 77 adds a 'Script Re-Inject' feature (renamed from 'Live Hot-Reload') allowing the macro controller to detect version mismatches against the extension's bundled scripts and re-inject without a page refresh. The extension reads scripts via `chrome.runtime.getURL()` from `web_accessible_resources` (NOT the filesystem), meaning the extension must be rebuilt and reloaded first — this feature eliminates steps 3-4 (page refresh + manual re-inject). Two message types are used: `GET_SCRIPT_INFO` (version check) and `HOT_RELOAD_SCRIPT` (returns full script source). The macro controller handles its own teardown (`destroyPanel()`) + blob re-eval in MAIN world. State is preserved via `__marco_reinject_*` localStorage keys with a 10s TTL. Loops are NOT auto-restarted after re-inject. Tasks 8.1-8.4 (extension infrastructure) are complete; 8.5-8.8 (UI + re-injection logic) remain.

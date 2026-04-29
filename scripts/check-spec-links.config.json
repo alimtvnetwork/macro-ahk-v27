@@ -1,0 +1,20 @@
+{
+  "_doc": "Shared configuration for scripts/check-spec-links.mjs and scripts/report-spec-links-ci.mjs. Underscore-prefixed fields are inline documentation and are ignored at runtime. Edit this file to add archive directories or tune auto-resolve — no JS changes required.",
+
+  "scanRoots": ["spec"],
+  "_scanRootsNote": "Repo-relative directories that are recursively scanned for .md files. Add additional roots (e.g. '.lovable') here if you want their cross-links validated too.",
+
+  "excludeDirs": ["99-archive", "imported"],
+  "_excludeDirsNote": "Directory NAMES (not paths) that are skipped during the recursive scan. Match is on the directory's own name, anywhere in the tree. Frozen historical content lives here; cross-links into deleted/refactored siblings are intentional rot, not actionable bugs. Add new archive folders by name to suppress them without touching JS.",
+
+  "autoResolve": {
+    "enabled": true,
+    "_enabledNote": "When true, the CI checker tries to auto-resolve broken links via the same suffix-overlap algorithm rewrite-spec-links.mjs uses. Confidently-resolvable links are downgraded from ERROR to WARNING (build still passes). Truly missing links remain hard errors. Disable to restore strict 'every link must already be correct on disk' behaviour.",
+
+    "minScore": 1,
+    "_minScoreNote": "Minimum suffix-overlap score required to accept an auto-resolved candidate. 1 = at least the basename matches. Higher = more conservative (fewer auto-resolves, fewer false positives).",
+
+    "searchRoots": ["spec", ".lovable"],
+    "_searchRootsNote": "Repo-relative roots used to build the basename → absolute-path index for candidate replacements. Order matters for tie-breaking — earlier roots win on equal scores."
+  }
+}
