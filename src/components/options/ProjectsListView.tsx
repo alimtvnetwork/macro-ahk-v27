@@ -726,6 +726,7 @@ interface SelectProjectsExportDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+// eslint-disable-next-line max-lines-per-function
 function SelectProjectsExportDialog({
   open,
   projects,
