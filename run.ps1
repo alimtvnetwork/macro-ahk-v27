@@ -19,7 +19,7 @@ param(
     [Alias('w')][switch]$watch,
     [Alias('dm')][switch]$directmode,
     [Alias('h')][switch]$help,
-    [Alias('v')][switch]$verbose,
+    [Alias('v')][switch]$verboseMode,
     [Alias('pf')][switch]$preflight,
     [Alias('dl')][switch]$downloadchrome,
     [Alias('k')][switch]$killbrowser,
