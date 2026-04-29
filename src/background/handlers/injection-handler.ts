@@ -16,6 +16,7 @@
  */
 
 import type { MessageRequest, OkResponse } from "../../shared/messages";
+import { parse } from "acorn";
 import { logBgWarnError, logCaughtError, BgLogTag } from "../bg-logger";
 import type { InjectableScript, InjectionResult, InjectScriptsResponse, SkipReason } from "../../shared/injection-types";
 import type { StoredProject, ScriptEntry } from "../../shared/project-types";
@@ -773,12 +774,16 @@ async function injectAllScripts(
  */
 function detectSyntaxError(code: string): string | null {
     try {
-        new Function(code);
+        parse(`(function(){\n${code}\n});`, {
+            ecmaVersion: "latest",
+            sourceType: "script",
+            allowReturnOutsideFunction: false,
+        });
         return null;
     } catch (err) {
-        if (err instanceof SyntaxError) {
+        if (err instanceof SyntaxError || err instanceof Error) {
             console.debug(
-                "[injection:syntax-preflight] detectSyntaxError caught SyntaxError (codeLen=%d): %s",
+                "[injection:syntax-preflight] detectSyntaxError caught parse error (codeLen=%d): %s",
                 code.length,
                 err.message,
             );
