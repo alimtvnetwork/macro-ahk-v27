@@ -279,7 +279,7 @@ Write-Host "  $ProjectName - Build & Deploy" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-if ($verbose) {
+if ($verboseMode) {
     Write-Host "Configuration:" -ForegroundColor Gray
     Write-Host "  Script Dir:    $ScriptDir" -ForegroundColor Gray
     Write-Host "  Extension Dir: $ExtensionDir" -ForegroundColor Gray
@@ -485,7 +485,7 @@ $stepWatch = [System.Diagnostics.Stopwatch]::StartNew()
 if ($deploy -or $directmode) {
     Write-Host "[4/4] Deploying to $browser profile..." -ForegroundColor Yellow
 
-    if ($verbose) {
+    if ($verboseMode) {
         Write-Host "  Available profiles:" -ForegroundColor Gray
         $profiles = Get-AvailableProfiles
         foreach ($p in $profiles) {
@@ -597,7 +597,7 @@ if ($skipbuild)   { $activeFlags += "-s" }
 if ($deploy)      { $activeFlags += "-d" }
 if ($directmode)  { $activeFlags += "-dm" }
 if ($watch)       { $activeFlags += "-w" }
-if ($verbose)     { $activeFlags += "-v" }
+if ($verboseMode)     { $activeFlags += "-v" }
 if ($activeFlags.Count -gt 0) {
     Write-Host "  Flags:       $($activeFlags -join ', ')" -ForegroundColor Gray
 } else {
