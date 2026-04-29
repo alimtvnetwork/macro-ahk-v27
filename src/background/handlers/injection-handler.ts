@@ -143,6 +143,7 @@ function getInlineSyntaxCheckScript(
     };
 }
 
+// eslint-disable-next-line max-lines-per-function
 function requestHasInlineSyntaxError(
     scripts: InjectionRequestScript[],
 ): boolean {
@@ -916,6 +917,7 @@ function extractMacroVersion(code: string): string | null {
 }
 
 /** Logs a successful script injection to the logs DB. */
+// eslint-disable-next-line max-lines-per-function
 async function logInjectionSuccess(
     script: InjectableScript,
     projectId: string | undefined,
@@ -1552,6 +1554,7 @@ const relayInjectedTabs = new Set<number>();
  * ✅ 15.6: Optimized relay injection — single combined probe-and-inject.
  * Reduces from 2-4 executeScript IPC calls to 1-2.
  */
+// eslint-disable-next-line max-lines-per-function
 async function ensureRelayInjected(tabId: number): Promise<void> {
     if (relayInjectedTabs.has(tabId)) {
         return;
