@@ -1235,9 +1235,9 @@ jobs:
           path: |
             .cache/standalone-builds/payment-banner-hider
             .cache/tsbuildinfo/payment-banner-hider.tsbuildinfo
-          key: ${{ runner.os }}-stdbuild-payment-banner-hider-${{ hashFiles('standalone-scripts/payment-banner-hider/src/**', 'standalone-scripts/payment-banner-hider/instruction.ts', 'standalone-scripts/payment-banner-hider/package.json', 'tsconfig.payment-banner-hider.json', 'tsconfig.sdk.json', 'tsconfig.xpath.json', 'tsconfig.macro.build.json', 'tsconfig.payment-banner-hider.json', 'vite.config.payment-banner-hider.ts', 'vite.config.sdk.ts', 'vite.config.xpath.ts', 'vite.config.macro.ts', 'vite.config.payment-banner-hider.ts', 'pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-stdbuild-payment-banner-hider-v2-xpathfix-${{ hashFiles('standalone-scripts/payment-banner-hider/src/**', 'standalone-scripts/payment-banner-hider/instruction.ts', 'standalone-scripts/payment-banner-hider/package.json', 'tsconfig.payment-banner-hider.json', 'tsconfig.sdk.json', 'tsconfig.xpath.json', 'tsconfig.macro.build.json', 'tsconfig.payment-banner-hider.json', 'vite.config.payment-banner-hider.ts', 'vite.config.sdk.ts', 'vite.config.xpath.ts', 'vite.config.macro.ts', 'vite.config.payment-banner-hider.ts', 'pnpm-lock.yaml') }}
           restore-keys: |
-            ${{ runner.os }}-stdbuild-payment-banner-hider-
+            ${{ runner.os }}-stdbuild-payment-banner-hider-v2-xpathfix-
 
       - name: Build Payment Banner Hider
         run: pnpm run build:payment-banner-hider
