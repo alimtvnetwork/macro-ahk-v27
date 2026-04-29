@@ -1638,6 +1638,9 @@ jobs:
       - build-xpath
       - build-payment-banner-hider
       - build-macro-controller
+      - build-lovable-common
+      - build-lovable-owner-switch
+      - build-lovable-user-add
 
     strategy:
       # Don't short-circuit the other legs when one project fails —
