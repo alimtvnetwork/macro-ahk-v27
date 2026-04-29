@@ -98,6 +98,10 @@ export class PaymentBannerHider implements PaymentBannerHiderApi {
             return;
         }
 
+        if (typeof MutationObserver === "undefined") {
+            return;
+        }
+
         const root = document.body ?? document.documentElement;
         this.observer = new MutationObserver(() => {
             this.scheduleCheck();
