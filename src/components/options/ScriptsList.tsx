@@ -978,5 +978,4 @@ function formatJson(input: JsonValue): string {
   try { return JSON.stringify(input ?? {}, null, 2); } catch { return "{}"; }
 }
 
-// eslint-disable-next-line react-refresh/only-export-components -- shared utilities consumed by sibling modules
 export { RunAtSelect, RunAtLabel, RUN_AT_OPTIONS, FileDropZone };

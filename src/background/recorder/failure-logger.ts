@@ -470,7 +470,6 @@ export function formatFailureReport(report: FailureReport): string {
  */
 export function logFailure(input: BuildFailureReportInput): FailureReport {
     const report = buildFailureReport(input);
-    // eslint-disable-next-line no-console
     console.error(formatFailureReport(report));
     return report;
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* eslint-disable */
+// Disabled lint: this is a CommonJS test fixture, not part of the linted source set.
 // ─────────────────────────────────────────────────────────────────────
 // Marco Extension — Installer Mock Server
 //
