@@ -9,7 +9,7 @@
  *  - Single class entry point with injected BannerLocator dependency.
  *  - State machine driven by the BannerState enum (no magic strings).
  *  - All CSS lives in a sibling .css file referenced from instruction.ts.
- *  - Specificity comes from [data-marco-banner-hider]; no !important.
+ *  - Specificity comes from [data-marco-banner-hider]; no force-overrides.
  *  - Catches log via Logger.error and rethrow; nothing is swallowed.
  *  - No requestAnimationFrame — the CSS transition handles timing.
  */
