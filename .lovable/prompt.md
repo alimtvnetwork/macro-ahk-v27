@@ -7,6 +7,7 @@ Reusable, copy-pastable prompts that drive repeatable workflows on this project.
 | Write Memory / End Memory (concise) | [`prompts/01-write-memory.md`](./prompts/01-write-memory.md) | Persist everything learned/done/pending at end of a session so the next AI starts with zero context loss. |
 | Write Memory / End Memory (full protocol v2.0) | [`prompts/02-write-memory.md`](./prompts/02-write-memory.md) | Expanded protocol with all 5 phases, deferred-task handling, anti-corruption rules. |
 | Write Memory / End Memory (full protocol **v3.0** — current) | [`prompts/03-write-memory.md`](./prompts/03-write-memory.md) | Adds CI/CD issues folder (`.lovable/cicd-issues/` + `cicd-index.md`) and verbatim-spec capture rules. **Use this one.** |
+| Read Memory (AI onboarding sequence v1.0) | [`prompts/05-read-memory.md`](./prompts/05-read-memory.md) | Mandatory onboarding for any AI joining the project. Trigger phrase: **"read memory"**. |
 
 ## Conventions
 
