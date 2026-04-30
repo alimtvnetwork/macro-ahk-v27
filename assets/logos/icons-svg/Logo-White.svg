@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="MacroMate logo (white)">
+  <rect x="0" y="0" width="512" height="512" rx="112" ry="112" fill="none"/>
+  <path d="M96 388 V146 a20 20 0 0 1 35 -13 l112 142 a16 16 0 0 0 26 0 l112 -142 a20 20 0 0 1 35 13 V388 a20 20 0 0 1 -40 0 V214 l-92 117 a32 32 0 0 1 -52 0 l-92 -117 V388 a20 20 0 0 1 -40 0 Z" fill="#FFFFFF"/>
+  <circle cx="396" cy="396" r="74" fill="#FFFFFF"/>
+  <path d="M380 366 L424 392 a6 6 0 0 1 0 10 L380 428 a6 6 0 0 1 -10 -5 V371 a6 6 0 0 1 10 -5 Z" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linejoin="round"/>
+</svg>
