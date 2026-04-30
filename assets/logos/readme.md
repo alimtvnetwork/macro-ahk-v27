@@ -51,7 +51,7 @@
 | Muted | `#F4F1FB` | `258 60% 97%` |
 | Border | `#E5DEF7` | `258 64% 92%` |
 
-Full reference: [`colors-themes/Palette.md`](./colors-themes/Palette.md)
+Full reference: [`colors-themes/palette.md`](./colors-themes/palette.md)
 
 ## Theme Tokens
 
