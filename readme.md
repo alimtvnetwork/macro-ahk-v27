@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/marco-logo.png" alt="Marco Extension Logo" width="128" height="128" />
+<img src="docs/assets/marco-logo.gif" alt="Marco Extension animated logo" width="160" height="160" />
 
 # <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/windows8/windows8-original.svg" alt="Windows" width="28" height="28" align="center" /> Marco Chrome Extension
 
