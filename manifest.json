@@ -28,15 +28,17 @@
         "default_popup": "src/popup/popup.html",
         "default_title": "Marco",
         "default_icon": {
-            "16": "favicon.png",
-            "48": "favicon.png",
-            "128": "favicon.png"
+            "16": "icons/icon-16.png",
+            "32": "icons/icon-32.png",
+            "48": "icons/icon-48.png",
+            "128": "icons/icon-128.png"
         }
     },
     "icons": {
-        "16": "favicon.png",
-        "48": "favicon.png",
-        "128": "favicon.png"
+        "16": "icons/icon-16.png",
+        "32": "icons/icon-32.png",
+        "48": "icons/icon-48.png",
+        "128": "icons/icon-128.png"
     },
     "options_page": "src/options/options.html",
     "content_scripts": [
