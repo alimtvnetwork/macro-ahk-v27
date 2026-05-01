@@ -1,5 +1,5 @@
 {
-  "GeneratedAt": "2026-04-28T18:47:56.249Z",
+  "GeneratedAt": "2026-05-01T08:11:58.536Z",
   "Items": [
     {
       "Id": "a2e58908054f",
@@ -186,6 +186,33 @@
       "Severity": "P1",
       "File": "src/background/recorder/step-library/import-bundle.ts",
       "Line": 589,
+      "Rule": "no-empty-catch",
+      "Message": "Empty catch block — error is silently dropped, no Logger.error() call.",
+      "Snippet": "catch {"
+    },
+    {
+      "Id": "c9ddfc72b0e3",
+      "Severity": "P1",
+      "File": "src/background/recorder/step-library/result-webhook.ts",
+      "Line": 213,
+      "Rule": "no-empty-catch",
+      "Message": "Empty catch block — error is silently dropped, no Logger.error() call.",
+      "Snippet": "catch {"
+    },
+    {
+      "Id": "70148b153433",
+      "Severity": "P1",
+      "File": "src/background/recorder/step-library/result-webhook.ts",
+      "Line": 329,
+      "Rule": "no-empty-catch",
+      "Message": "Empty catch block — error is silently dropped, no Logger.error() call.",
+      "Snippet": "catch {"
+    },
+    {
+      "Id": "de9809c58239",
+      "Severity": "P1",
+      "File": "src/background/recorder/step-library/result-webhook.ts",
+      "Line": 341,
       "Rule": "no-empty-catch",
       "Message": "Empty catch block — error is silently dropped, no Logger.error() call.",
       "Snippet": "catch {"
